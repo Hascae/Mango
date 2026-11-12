@@ -118,7 +118,6 @@ android {
 
         externalNativeBuild {
             cmake {
-                version = '4.1.2'
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-24' //, '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
             }
         }
