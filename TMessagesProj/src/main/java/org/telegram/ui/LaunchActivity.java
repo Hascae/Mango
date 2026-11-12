@@ -116,6 +116,7 @@ import org.telegram.messenger.FlagSecureReason;
 import org.telegram.messenger.GenericProvider;
 import org.telegram.messenger.GiftAuctionController;
 import org.telegram.messenger.LiteMode;
+import org.telegram.messenger.LocalNetworkAccess;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.LocationController;
 import org.telegram.messenger.MediaController;
@@ -2802,7 +2803,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                     if (cursor != null) {
                                         if (cursor.moveToFirst()) {
                                             long userId = cursor.getLong(cursor.getColumnIndex(ContactsContract.Data.DATA4));
-                                            int accountId = Utilities.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.RawContacts.ACCOUNT_NAME)));
+                                            int accountId = Utilities.parseInt(ContactsController.getRawContactAccountName(getContentResolver(), cursor.getLong(cursor.getColumnIndex(ContactsContract.Data.RAW_CONTACT_ID))));
                                             int[] activatedAccounts = UserConfig.getActivatedAccounts();
                                             for (int a = -1; a < activatedAccounts.length; a++) {
                                                 int i = a == -1 ? intentAccount[0] : activatedAccounts[a];
@@ -6861,6 +6862,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         super.onResume();
         applyDefaultClientOverrides();
         BuiltinProxyController.refreshProxyConnection();
+        LocalNetworkAccess.onActivityResumed();
         isResumed = true;
         MangoPerformanceMonitor.setForeground(true);
         MangoDownloadSpeedHud.attach(this);

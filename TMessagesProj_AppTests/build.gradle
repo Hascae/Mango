@@ -109,7 +109,7 @@ android {
 
     defaultConfig {
         minSdk 26
-        targetSdk 35
+        targetSdk = 37
         versionName APP_VERSION_NAME
 
         multiDexEnabled = true
