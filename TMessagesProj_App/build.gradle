@@ -20,9 +20,9 @@ dependencies {
 }
 
 android {
-    compileSdk 35
+    compileSdk = 37
     buildToolsVersion '37.0.0'
-    ndkVersion = "21.4.7075529"
+    ndkVersion = "30.0.16248370"
 
     defaultConfig.applicationId = APP_PACKAGE
 
@@ -121,7 +121,6 @@ android {
             sourceSets.release {
                 manifest.srcFile '../TMessagesProj/config/release/AndroidManifest_SDK23.xml'
             }
-            minSdk 23
             buildConfigField "boolean", "BUNDLE", "true"
         }
         afat {
@@ -144,7 +143,7 @@ android {
     defaultConfig.versionCode = Integer.parseInt(APP_VERSION_CODE)
 
     defaultConfig {
-        minSdk 21
+        minSdk = 24
         targetSdk 35
         versionName APP_VERSION_NAME
 
@@ -154,8 +153,8 @@ android {
 
         externalNativeBuild {
             cmake {
-                version = '3.10.2'
-                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' // , '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                version = '4.1.2'
+                arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-24' // , '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
             }
         }
     }
