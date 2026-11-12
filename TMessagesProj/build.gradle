@@ -1,5 +1,3 @@
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
-
 apply plugin: 'com.android.library'
 
 repositories {
@@ -7,11 +5,8 @@ repositories {
     google()
 }
 
-configurations {
-    compile.exclude module: 'support-v4'
-}
-
-configurations.all {
+configurations.configureEach {
+    exclude module: 'support-v4'
     exclude group: 'com.google.firebase', module: 'firebase-core'
     exclude group: 'androidx.recyclerview', module: 'recyclerview'
 }
@@ -71,11 +66,11 @@ dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
 
-def isWindows = String.valueOf(DefaultNativePlatform.currentOperatingSystem.toFamilyName() == OperatingSystemFamily.WINDOWS)
+def isWindows = String.valueOf(System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows'))
 android {
-    compileSdkVersion 35
-    buildToolsVersion '35.0.0'
-    ndkVersion "21.4.7075529"
+    compileSdk 35
+    buildToolsVersion '37.0.0'
+    ndkVersion = "21.4.7075529"
 
     sourceSets.main.jniLibs.srcDirs = ['./jni/']
 
@@ -85,31 +80,29 @@ android {
         }
     }
 
-    lintOptions {
-        disable 'MissingTranslation'
-        disable 'ExtraTranslation'
-        disable 'BlockedPrivateApi'
+    lint {
+        disable += ['MissingTranslation', 'ExtraTranslation', 'BlockedPrivateApi']
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
 
-        coreLibraryDesugaringEnabled true
+        coreLibraryDesugaringEnabled = true
     }
 
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 35
+        minSdk 21
+        targetSdk 35
 
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 
-        multiDexEnabled true
+        multiDexEnabled = true
 
         externalNativeBuild {
             cmake {
-                version '3.10.2'
+                version = '3.10.2'
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' //, '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
             }
         }
@@ -119,9 +112,9 @@ android {
         debug {
             jniDebuggable true
             minifyEnabled false
-            shrinkResources false
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
+            shrinkResources = false
+            multiDexEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
             buildConfigField "String", "APP_CENTER_HASH", "\"\""
@@ -136,8 +129,8 @@ android {
         HA_private {
             jniDebuggable false
             minifyEnabled true
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
+            multiDexEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
             buildConfigField "String", "APP_CENTER_HASH", "\"" + getProps("APP_CENTER_HASH_PRIVATE") + "\""
@@ -152,8 +145,8 @@ android {
         HA_public {
             jniDebuggable false
             minifyEnabled true
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
+            multiDexEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
             buildConfigField "String", "APP_CENTER_HASH", "\"" + getProps("APP_CENTER_HASH_PUBLIC") + "\""
@@ -168,8 +161,8 @@ android {
         HA_hardcore {
             jniDebuggable false
             minifyEnabled true
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
+            multiDexEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
             buildConfigField "String", "APP_CENTER_HASH", "\"" + getProps("APP_CENTER_HASH_HARDCORE") + "\""
@@ -184,8 +177,8 @@ android {
         standalone {
             jniDebuggable false
             minifyEnabled true
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
+            multiDexEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
             buildConfigField "String", "APP_CENTER_HASH", "\"\""
@@ -200,9 +193,9 @@ android {
         release {
             jniDebuggable false
             minifyEnabled true
-            shrinkResources false
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
+            shrinkResources = false
+            multiDexEnabled = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
             buildConfigField "String", "APP_CENTER_HASH", "\"\""
@@ -215,7 +208,11 @@ android {
         }
     }
 
-    namespace 'org.telegram.messenger'
+    namespace = 'org.telegram.messenger'
+    enableKotlin = false
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
 
@@ -229,24 +226,24 @@ def getProps(String propName) {
         return "";
     }
 }
-task checkVisibility {
+def requestedTasks = gradle.startParameter.taskNames
+def publicAllowed = !project.hasProperty("IS_PRIVATE") || !project.property("IS_PRIVATE").toBoolean()
+def privateBetaApk = file("${projectDir}_AppHockeyApp/afat/HA_private/Telegram-Beta.apk")
+
+def checkVisibility = tasks.register('checkVisibility') {
     doFirst {
-        def isPrivateBuild = project.gradle.startParameter.taskNames.find {
+        def isPrivateBuild = requestedTasks.find {
             it.contains("HA_private") || it.contains("HA_hardcore") || it.contains("Debug") || it.contains("Release")
         }
-        def isPublicAllowed = !project.hasProperty("IS_PRIVATE") || !project.property("IS_PRIVATE").toBoolean()
-        if (!isPrivateBuild && !isPublicAllowed) {
+        if (!isPrivateBuild && !publicAllowed) {
             throw new GradleException("Building public version of private code!")
         }
     }
     doLast {
-        if (project.gradle.startParameter.taskNames.find { it.contains("HA_public") }) {
-            def privateBuild = file("${projectDir}_AppHockeyApp/afat/HA_private/Telegram-Beta.apk")
-            if (privateBuild.exists()) {
-                privateBuild.delete()
-            }
+        if (requestedTasks.find { it.contains("HA_public") } && privateBetaApk.exists()) {
+            privateBetaApk.delete()
         }
     }
 }
 
-preBuild.dependsOn checkVisibility
+tasks.named('preBuild') { dependsOn checkVisibility }
