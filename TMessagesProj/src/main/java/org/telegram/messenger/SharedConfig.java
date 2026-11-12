@@ -568,6 +568,10 @@ public class SharedConfig {
         return MessagesController.getGlobalMainSettings().getBoolean(PREF_VPN_PROXY_AUTO_SWITCH_ENABLED, true);
     }
 
+    public static boolean isVpnProxyAutoSwitchSetByUser() {
+        return MessagesController.getGlobalMainSettings().contains(PREF_VPN_PROXY_AUTO_SWITCH_ENABLED);
+    }
+
     public static void setVpnProxyAutoSwitchEnabled(boolean enabled) {
         MessagesController.getGlobalMainSettings().edit().putBoolean(PREF_VPN_PROXY_AUTO_SWITCH_ENABLED, enabled).apply();
     }

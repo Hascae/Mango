@@ -299,7 +299,7 @@ public class ApplicationLoader extends Application {
         }
 
         SharedConfig.loadConfig();
-        BuiltinProxyController.bootstrap();
+        ProxyGate.bootstrap();
         SharedPrefsHelper.init(applicationContext);
 
         ArrayList<Integer> accountsToLoad = new ArrayList<>();
@@ -463,7 +463,7 @@ public class ApplicationLoader extends Application {
 
         LauncherIconController.tryFixLauncherIconIfNeeded();
         ProxyRotationController.init();
-        BuiltinProxyController.init();
+        ProxyGate.runWhenSyncAllowed(BuiltinProxyController::init);
         ScamKeywordsUpdateService.schedule();
     }
 
@@ -568,7 +568,7 @@ public class ApplicationLoader extends Application {
         }
     }
 
-    private static void syncProxyWithVpnState(boolean force) {
+    static void syncProxyWithVpnState(boolean force) {
         if (applicationHandler == null) {
             return;
         }
@@ -584,6 +584,9 @@ public class ApplicationLoader extends Application {
             lastVpnProxyState = -1;
             return;
         }
+        if (ProxyGate.isHolding()) {
+            return;
+        }
         boolean vpnActive = isVpnActive();
         int vpnState = vpnActive ? 1 : 0;
         if (!force && lastVpnProxyState == vpnState) {
@@ -593,7 +596,7 @@ public class ApplicationLoader extends Application {
         setProxyEnabledForVpnState(!vpnActive);
     }
 
-    private static boolean isVpnActive() {
+    static boolean isVpnActive() {
         try {
             if (connectivityManager == null) {
                 connectivityManager = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
