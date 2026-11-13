@@ -2411,6 +2411,10 @@ public class Theme {
                 return getString(R.string.ThemeDay);
             } else if ("Night".equals(name)) {
                 return getString(R.string.ThemeNight);
+            } else if ("Frost".equals(name)) {
+                return getString(R.string.SkinThemeFrost);
+            } else if ("Frost Night".equals(name)) {
+                return getString(R.string.SkinThemeFrostNight);
             }
             return info != null ? info.title : name;
         }
@@ -2527,9 +2531,9 @@ public class Theme {
             if (isDark != UNKNOWN) {
                 return isDark == DARK;
             }
-            if ("Dark Blue".equals(name) || "Night".equals(name)) {
+            if ("Dark Blue".equals(name) || "Night".equals(name) || "Frost Night".equals(name)) {
                 isDark = DARK;
-            } else if ("Blue".equals(name) || "Arctic Blue".equals(name) || "Day".equals(name)) {
+            } else if ("Blue".equals(name) || "Arctic Blue".equals(name) || "Day".equals(name) || "Frost".equals(name)) {
                 isDark = LIGHT;
             }
             if (isDark == UNKNOWN) {
@@ -4763,6 +4767,28 @@ public class Theme {
         sortAccents(themeInfo);
         themes.add(themeInfo);
         themesDict.put("Night", themeInfo);
+
+        // The redesign's own pair, generated from its design tokens in
+        // TMessagesProj_Skin. They are the defaults for day and night.
+        themeInfo = new ThemeInfo();
+        themeInfo.name = "Frost";
+        themeInfo.assetName = "skin_frost.attheme";
+        themeInfo.previewBackgroundColor = 0xffeef2f3;
+        themeInfo.previewInColor = 0xffffffff;
+        themeInfo.previewOutColor = 0xff20272b;
+        themeInfo.sortIndex = -2;
+        themes.add(currentDayTheme = defaultTheme = themeInfo);
+        themesDict.put("Frost", themeInfo);
+
+        themeInfo = new ThemeInfo();
+        themeInfo.name = "Frost Night";
+        themeInfo.assetName = "skin_frost_night.attheme";
+        themeInfo.previewBackgroundColor = 0xff121618;
+        themeInfo.previewInColor = 0xff1f2529;
+        themeInfo.previewOutColor = 0xff2a4843;
+        themeInfo.sortIndex = -1;
+        themes.add(themeInfo);
+        themesDict.put("Frost Night", currentNightTheme = themeInfo);
 
         String themesString = themeConfig.getString("themes2", null);
 

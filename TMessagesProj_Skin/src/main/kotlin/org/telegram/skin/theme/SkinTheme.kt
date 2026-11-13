@@ -1,0 +1,62 @@
+package org.telegram.skin.theme
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+
+private val LocalSkinColors = staticCompositionLocalOf { FrostLight }
+private val LocalSkinShadows = staticCompositionLocalOf { FrostLightShadows }
+private val LocalSkinType = staticCompositionLocalOf { DefaultSkinType }
+private val LocalSkinShapes = staticCompositionLocalOf { SkinShapes() }
+private val LocalSkinSpace = staticCompositionLocalOf { SkinSpace() }
+
+/** Read the current tokens anywhere under [SkinTheme]. */
+object Skin {
+    val colors: SkinColors
+        @Composable @ReadOnlyComposable get() = LocalSkinColors.current
+    val shadows: SkinShadows
+        @Composable @ReadOnlyComposable get() = LocalSkinShadows.current
+    val type: SkinType
+        @Composable @ReadOnlyComposable get() = LocalSkinType.current
+    val shapes: SkinShapes
+        @Composable @ReadOnlyComposable get() = LocalSkinShapes.current
+    val space: SkinSpace
+        @Composable @ReadOnlyComposable get() = LocalSkinSpace.current
+}
+
+/**
+ * Provides the tokens to [content]. Theme and direction are the caller's call:
+ * inside the app both follow Telegram's own settings (current theme, chosen
+ * language) rather than the system's, so the new screens never disagree with
+ * the old ones next to them.
+ */
+@Composable
+fun SkinTheme(dark: Boolean, rtl: Boolean, content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalSkinColors provides if (dark) FrostDark else FrostLight,
+        LocalSkinShadows provides if (dark) FrostDarkShadows else FrostLightShadows,
+        LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+        content = content,
+    )
+}
+
+/** Paints each layer of a shadow spec under the content, first layer first. */
+fun Modifier.shadows(layers: List<ShadowLayer>, shape: Shape): Modifier =
+    layers.fold(this) { modifier, layer ->
+        modifier.dropShadow(
+            shape = shape,
+            shadow = Shadow(
+                radius = layer.radius,
+                color = layer.color,
+                spread = layer.spread,
+                offset = layer.offset,
+            ),
+        )
+    }
