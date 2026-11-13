@@ -41,6 +41,16 @@ import java.util.ArrayList;
 import java.util.HashSet;
 
 public class ChannelFeedActivity extends BaseFragment implements MainTabsActivity.TabFragmentDelegate {
+    private final boolean inMainTabs;
+
+    public ChannelFeedActivity() {
+        this(true);
+    }
+
+    /** Off the tab bar (opened from the 我 page's toolbox) the page gets a back button. */
+    public ChannelFeedActivity(boolean inMainTabs) {
+        this.inMainTabs = inMainTabs;
+    }
 
     private static final int ITEM_ID_CHANNEL = 1;
     private static final int ITEM_ID_RELOAD = 2;
@@ -58,6 +68,17 @@ public class ChannelFeedActivity extends BaseFragment implements MainTabsActivit
     public View createView(Context context) {
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(getString(R.string.ChannelFeedTitle));
+        if (!inMainTabs) {
+            actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+            actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
+                @Override
+                public void onItemClick(int id) {
+                    if (id == -1) {
+                        finishFragment();
+                    }
+                }
+            });
+        }
 
         FrameLayout contentView = new FrameLayout(context);
         contentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));

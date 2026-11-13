@@ -275,7 +275,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private static final boolean TMP_DISABLE_TOPICS_TWO_COLUMNS = false;
 
-    public static final int MAIN_TABS_HEIGHT = 56;
+    // The skin's aluminium dock stands a little taller than the glass bar.
+    public static final int MAIN_TABS_HEIGHT = SkinSwitch.MAIN_TABS ? 64 : 56;
     public static final int MAIN_TABS_MARGIN = 8;
     public static final int MAIN_TABS_HEIGHT_WITH_MARGINS = MAIN_TABS_HEIGHT + MAIN_TABS_MARGIN * 2;
     public static final int FILTER_TABS_HEIGHT = 36;
@@ -4657,7 +4658,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
         });
 
-        if (!isArchive() && initialDialogsType == DIALOGS_TYPE_DEFAULT) {
+        // The hint points at the story button, which is hidden when the tab bar has its own compose key.
+        final boolean ownsCompose = mainTabsActivityController != null && mainTabsActivityController.ownsComposeButton();
+        if (!isArchive() && initialDialogsType == DIALOGS_TYPE_DEFAULT && !ownsCompose) {
             if (MessagesController.getInstance(currentAccount).getMainSettings().getBoolean("storyhint", true)) {
                 storyHint = new HintView2(context, HintView2.DIRECTION_RIGHT)
                         .setRounding(8)
@@ -8846,7 +8849,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void updateFloatingButtonVisibility(boolean animated) {
-        final boolean isVisible = !(onlySelect && initialDialogsType != 10 || folderId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden);
+        final boolean isVisible = !(onlySelect && initialDialogsType != 10 || folderId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden
+            || mainTabsActivityController != null && mainTabsActivityController.ownsComposeButton());
 
         if (floatingButton3 != null) {
             floatingButton3.setButtonVisible(isVisible, animated);
@@ -13386,13 +13390,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
                 switchingTheme = true;
                 SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("themeconfig", Activity.MODE_PRIVATE);
-                String dayThemeName = preferences.getString("lastDayTheme", "Blue");
+                String dayThemeName = preferences.getString("lastDayTheme", "Frost");
                 if (Theme.getTheme(dayThemeName) == null || Theme.getTheme(dayThemeName).isDark()) {
-                    dayThemeName = "Blue";
+                    dayThemeName = "Frost";
                 }
-                String nightThemeName = preferences.getString("lastDarkTheme", "Dark Blue");
+                String nightThemeName = preferences.getString("lastDarkTheme", "Frost Night");
                 if (Theme.getTheme(nightThemeName) == null || !Theme.getTheme(nightThemeName).isDark()) {
-                    nightThemeName = "Dark Blue";
+                    nightThemeName = "Frost Night";
                 }
                 // Custom/imported day themes need the same toggle as the remembered default theme.
                 boolean toDark = !isCurrentThemeDark;

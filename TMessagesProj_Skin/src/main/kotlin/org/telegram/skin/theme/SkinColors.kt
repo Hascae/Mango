@@ -66,6 +66,8 @@ data class Metal(
     val capLit: Color,
     val capMid: Color,
     val capShade: Color,
+    /** A slab sitting further back in a stack, such as the other accounts' cards. */
+    val stacked: Color,
 )
 
 /** Celadon glaze set into the metal, used for the selected tab. */
@@ -77,6 +79,8 @@ data class Porcelain(
     val crackle: Color,
     /** Inner shadow that makes the glaze sit below the metal surface. */
     val recess: Color,
+    /** The lit lower lip of the recess. */
+    val lip: Color,
 )
 
 @Immutable
@@ -120,6 +124,7 @@ val FrostLight = SkinColors(
         capLit = Color(0xFFFFFFFF),
         capMid = Color(0xFFEEF1F3),
         capShade = Color(0xFFCFD6DA),
+        stacked = Color(0xFFE3E8EB),
     ),
     porcelain = Porcelain(
         glazeTop = Color(0xFFD9ECE6),
@@ -127,6 +132,7 @@ val FrostLight = SkinColors(
         text = Color(0xFF1F4A45),
         crackle = Color(0x291F4A45),
         recess = Color(0x331F4A45),
+        lip = Color(0xB3FFFFFF),
     ),
     bubbleIn = Bubble(
         background = Color(0xFFFFFFFF),
@@ -183,6 +189,7 @@ val FrostDark = SkinColors(
         capLit = Color(0xFF4A5358),
         capMid = Color(0xFF31393D),
         capShade = Color(0xFF23292C),
+        stacked = Color(0xFF262D31),
     ),
     porcelain = Porcelain(
         glazeTop = Color(0xFF33605A),
@@ -190,6 +197,7 @@ val FrostDark = SkinColors(
         text = Color(0xFFE6F2EF),
         crackle = Color(0x29E6F2EF),
         recess = Color(0x73000000),
+        lip = Color(0x14FFFFFF),
     ),
     bubbleIn = Bubble(
         background = Color(0xFF1F2529),

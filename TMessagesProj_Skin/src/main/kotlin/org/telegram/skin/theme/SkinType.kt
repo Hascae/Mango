@@ -37,6 +37,8 @@ private const val TABULAR = "tnum"
 // Every style takes its paragraph direction from the text itself, so Chinese
 // or English stays left-to-right (punctuation included) inside a mirrored,
 // right-to-left layout, and Arabic stays right-to-left inside a normal one.
+// Figures have no letters to go by, so they fall back to left-to-right and a
+// phone number keeps its order in an Arabic layout.
 private fun style(
     fontFamily: FontFamily? = null,
     fontWeight: FontWeight? = null,
@@ -44,6 +46,7 @@ private fun style(
     letterSpacing: TextUnit = TextUnit.Unspecified,
     lineHeight: TextUnit = TextUnit.Unspecified,
     fontFeatureSettings: String? = null,
+    textDirection: TextDirection = TextDirection.Content,
 ) = TextStyle(
     fontFamily = fontFamily,
     fontWeight = fontWeight,
@@ -51,7 +54,7 @@ private fun style(
     letterSpacing = letterSpacing,
     lineHeight = lineHeight,
     fontFeatureSettings = fontFeatureSettings,
-    textDirection = TextDirection.Content,
+    textDirection = textDirection,
 )
 
 @Immutable
@@ -91,7 +94,7 @@ data class SkinType(
 
 val DefaultSkinType = SkinType(
     display = style(fontFamily = SerifDisplay, fontWeight = FontWeight.Bold, fontSize = 36.sp, letterSpacing = 3.sp, lineHeight = 1.2.em),
-    displayCount = style(fontFamily = Numerals, fontWeight = FontWeight.Light, fontSize = 30.sp, fontFeatureSettings = TABULAR),
+    displayCount = style(fontFamily = Numerals, fontWeight = FontWeight.Light, fontSize = 30.sp, fontFeatureSettings = TABULAR, textDirection = TextDirection.ContentOrLtr),
     hero = style(fontFamily = SerifDisplay, fontWeight = FontWeight.Bold, fontSize = 26.sp, letterSpacing = 3.sp, lineHeight = 1.25.em),
     cardTitle = style(fontFamily = SerifDisplay, fontWeight = FontWeight.Bold, fontSize = 23.sp, letterSpacing = 2.sp, lineHeight = 1.25.em),
     panelTitle = style(fontFamily = SerifDisplay, fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 2.sp, lineHeight = 1.3.em),
@@ -106,6 +109,6 @@ val DefaultSkinType = SkinType(
     caption = style(fontSize = 12.sp, lineHeight = 1.4.em),
     micro = style(fontSize = 11.sp, lineHeight = 1.3.em),
 
-    figure = style(fontFamily = Numerals, fontSize = 12.sp, fontFeatureSettings = TABULAR),
-    figureSmall = style(fontFamily = Numerals, fontSize = 11.sp, fontFeatureSettings = TABULAR),
+    figure = style(fontFamily = Numerals, fontSize = 12.sp, fontFeatureSettings = TABULAR, textDirection = TextDirection.ContentOrLtr),
+    figureSmall = style(fontFamily = Numerals, fontSize = 11.sp, fontFeatureSettings = TABULAR, textDirection = TextDirection.ContentOrLtr),
 )

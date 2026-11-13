@@ -12,6 +12,8 @@ configurations.configureEach {
 }
 
 dependencies {
+    // The redesigned screens; this module reaches them through the Skin* bridge classes.
+    implementation project(':TMessagesProj_Skin')
     implementation 'androidx.core:core:1.19.1'
     implementation 'androidx.palette:palette:1.1.0'
     implementation 'androidx.exifinterface:exifinterface:1.4.2'
@@ -127,6 +129,8 @@ android {
         }
 
         HA_private {
+            // The skin module has no beta build types; it builds these as release.
+            matchingFallbacks = ["release"]
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled = true
@@ -143,6 +147,8 @@ android {
         }
 
         HA_public {
+            // The skin module has no beta build types; it builds these as release.
+            matchingFallbacks = ["release"]
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled = true
@@ -159,6 +165,8 @@ android {
         }
 
         HA_hardcore {
+            // The skin module has no beta build types; it builds these as release.
+            matchingFallbacks = ["release"]
             jniDebuggable false
             minifyEnabled true
             multiDexEnabled = true

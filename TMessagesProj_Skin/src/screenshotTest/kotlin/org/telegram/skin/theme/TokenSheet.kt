@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import org.telegram.skin.PreviewSkin
 import org.telegram.skin.SkinPreviews
+import org.telegram.skin.ui.Knob
 
 // A one-page look at every token, rendered in both themes. It is the first
 // check that the fonts load, the palette holds together and the shadow and
@@ -131,41 +131,7 @@ private fun MetalSlab() {
                 .height(34.dp)
                 .background(m.grooveCut),
         )
-        Knob()
-    }
-}
-
-@Composable
-private fun Knob() {
-    val m = Skin.colors.metal
-    // A knurled ring is a sweep of 72 alternating slivers.
-    val knurl = Brush.sweepGradient(List(144) { i -> if ((i / 2) % 2 == 0) m.knurlA else m.knurlB })
-    Box(Modifier.size(50.dp)) {
-        Box(Modifier.matchParentSize().clip(CircleShape).background(knurl), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier
-                    .size(39.dp)
-                    .drawBehind {
-                        // Lit from the upper left.
-                        drawCircle(
-                            Brush.radialGradient(
-                                listOf(m.capLit, m.capMid, m.capShade),
-                                center = Offset(size.width * 0.35f, size.height * 0.3f),
-                                radius = size.maxDimension,
-                            ),
-                        )
-                    },
-            )
-        }
-        // The LED sits on the rim, outside the ring's clip.
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 2.dp, end = 4.dp)
-                .size(5.dp)
-                .clip(CircleShape)
-                .background(Skin.colors.led),
-        )
+        Knob(turn = 0f, size = 50.dp)
     }
 }
 
