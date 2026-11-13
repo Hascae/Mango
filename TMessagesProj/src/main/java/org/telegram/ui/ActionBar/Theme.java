@@ -150,6 +150,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import org.telegram.ui.SkinStyle;
 
 public class Theme {
 
@@ -8418,7 +8419,11 @@ public class Theme {
             dialogs_countTextPaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
             dialogs_countTextPaint.setTypeface(AndroidUtilities.bold());
             dialogs_countTextPaint2 = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
-            dialogs_countTextPaint2.setTypeface(AndroidUtilities.bold());
+            if (SkinStyle.chatList()) {
+                SkinStyle.useNumerals(dialogs_countTextPaint2, true);
+            } else {
+                dialogs_countTextPaint2.setTypeface(AndroidUtilities.bold());
+            }
             dialogs_countPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             dialogs_reactionsCountPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             dialogs_onlineCirclePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -8454,6 +8459,9 @@ public class Theme {
             dialogs_messageNamePaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
             dialogs_messageNamePaint.setTypeface(AndroidUtilities.bold());
             dialogs_timePaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+            if (SkinStyle.chatList()) {
+                SkinStyle.useNumerals(dialogs_timePaint, false);
+            }
             dialogs_timePaintBold = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
             dialogs_timePaintBoldAccent = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
             dialogs_archiveTextPaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
@@ -8480,7 +8488,7 @@ public class Theme {
             dialogs_clockDrawable = new MsgClockDrawable();
             dialogs_errorDrawable = resources.getDrawable(R.drawable.list_warning_sign);
             dialogs_reorderDrawable = resources.getDrawable(R.drawable.list_reorder).mutate();
-            dialogs_muteDrawable = resources.getDrawable(R.drawable.list_mute).mutate();
+            dialogs_muteDrawable = resources.getDrawable(SkinStyle.chatList() ? org.telegram.skin.R.drawable.skin_list_mute : R.drawable.list_mute).mutate();
             dialogs_unmuteDrawable = resources.getDrawable(R.drawable.list_unmute).mutate();
             dialogs_verifiedDrawable = resources.getDrawable(R.drawable.verified_area).mutate();
             dialogs_scamDrawable = new ScamDrawable(11, 0);

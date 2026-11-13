@@ -57,6 +57,7 @@ import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.ImageSpan;
+import android.text.style.RelativeSizeSpan;
 import android.util.LongSparseArray;
 import android.util.Property;
 import android.util.StateSet;
@@ -2806,6 +2807,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private MainTabsActivityController mainTabsActivityController;
 
+    // The skin keeps the panels over the list solid instead of liquid glass.
+    private BlurredBackgroundDrawableViewFactory glassFactory() {
+        return SkinStyle.chatList() ? iBlur3FactoryFade : iBlur3FactoryLiquidGlass;
+    }
+
     public void setMainTabsActivityController(MainTabsActivityController controller) {
         mainTabsActivityController = controller;
     }
@@ -3621,7 +3627,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     }
 
                     ArrayList<MessagesController.DialogFilter> dialogFilters = getMessagesController().getDialogFilters();
-                    if (!tab.isDefault && (tab.id < 0 || tab.id >= dialogFilters.size())) {
+                    if (!tab.isDefault && tab.id != SKIN_UNREAD_TAB_ID && (tab.id < 0 || tab.id >= dialogFilters.size())) {
                         return;
                     }
                     viewPages[1].selectedType = tab.id;
@@ -3670,6 +3676,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     }
                     if (tabId == filterTabsView.getDefaultTabId()) {
                         return getMessagesStorage().getMainUnreadCount();
+                    }
+                    if (tabId == SKIN_UNREAD_TAB_ID) {
+                        return skinUnreadChats();
                     }
                     ArrayList<MessagesController.DialogFilter> dialogFilters = getMessagesController().getDialogFilters();
                     if (tabId < 0 || tabId >= dialogFilters.size()) {
@@ -4699,7 +4708,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
             });
 
-            BlurredBackgroundDrawable topPanelLayoutBackground = iBlur3FactoryLiquidGlass.create(topPanelLayout,
+            BlurredBackgroundDrawable topPanelLayoutBackground = glassFactory().create(topPanelLayout,
                 BlurredBackgroundProviderImpl.topPanel(resourceProvider));
 
 
@@ -5019,16 +5028,22 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         if (filterTabsView != null) {
-            BlurredBackgroundDrawable filterTabsViewBackground = iBlur3FactoryLiquidGlass.create(filterTabsView, BlurredBackgroundProviderImpl.topPanel(resourceProvider));
-            filterTabsViewBackground.setRadius(dp(18));
-            filterTabsViewBackground.setPadding(dp(6.666f));
-            filterTabsView.setPadding(0, dp(7), 0, dp(7));
-            filterTabsView.setBlurredBackground(filterTabsViewBackground);
-            contentView.addView(filterTabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 36 + 7 + 7, Gravity.TOP, 4, 0, 4, 0));
+            if (SkinStyle.chatList()) {
+                // A flat row across the page; the tab bar draws its own ground and hairline.
+                filterTabsView.setPadding(0, dp(7), 0, dp(7));
+                contentView.addView(filterTabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 36 + 7 + 7, Gravity.TOP));
+            } else {
+                BlurredBackgroundDrawable filterTabsViewBackground = iBlur3FactoryLiquidGlass.create(filterTabsView, BlurredBackgroundProviderImpl.topPanel(resourceProvider));
+                filterTabsViewBackground.setRadius(dp(18));
+                filterTabsViewBackground.setPadding(dp(6.666f));
+                filterTabsView.setPadding(0, dp(7), 0, dp(7));
+                filterTabsView.setBlurredBackground(filterTabsViewBackground);
+                contentView.addView(filterTabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 36 + 7 + 7, Gravity.TOP, 4, 0, 4, 0));
+            }
         }
 
         if (fragmentSearchField != null) {
-            fragmentSearchField.setupBlurredBackground(iBlur3FactoryLiquidGlass.create(fragmentSearchField, BlurredBackgroundProviderImpl.topPanel(resourceProvider)));
+            fragmentSearchField.setupBlurredBackground(glassFactory().create(fragmentSearchField, BlurredBackgroundProviderImpl.topPanel(resourceProvider)));
         }
 
         dialogStoriesCell = new DialogStoriesCell(context, this, currentAccount, isArchive() ? DialogStoriesCell.TYPE_ARCHIVE : DialogStoriesCell.TYPE_DIALOGS) {
@@ -6778,6 +6793,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             viewPages[a].listView.stopScroll();
         }
         int a = animated ? 1 : 0;
+        if (viewPages[a].selectedType == SKIN_UNREAD_TAB_ID) {
+            viewPages[a].dialogsType = DIALOGS_TYPE_UNREAD_UNMUTED;
+            viewPages[1].isLocked = false;
+            viewPages[a].listView.setScrollEnabled(true);
+            viewPages[a].dialogsAdapter.setDialogsType(viewPages[a].dialogsType);
+            viewPages[a].layoutManager.scrollToPositionWithOffset(0, (int) scrollYOffset);
+            checkListLoad(viewPages[a]);
+            return;
+        }
         if (viewPages[a].selectedType < 0 || viewPages[a].selectedType >= getMessagesController().getDialogFilters().size()) {
             return;
         }
@@ -6828,7 +6852,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             filterOptions = null;
         }
         ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
-        if (filters.size() > 1) {
+        if (filters.size() > 1 || showSkinUnreadTab()) {
             if (force || filterTabsView.getVisibility() != View.VISIBLE) {
                 boolean animatedUpdateItems = animated;
                 if (filterTabsView.getVisibility() != View.VISIBLE) {
@@ -6840,7 +6864,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 int id = filterTabsView.getCurrentTabId();
                 int stableId = filterTabsView.getCurrentTabStableId();
                 boolean selectWithStableId = false;
-                if (id != filterTabsView.getDefaultTabId() && id >= filters.size()) {
+                if (id != filterTabsView.getDefaultTabId() && id != SKIN_UNREAD_TAB_ID && id >= filters.size()) {
                     filterTabsView.resetTabId();
                     selectWithStableId = true;
                 }
@@ -6852,6 +6876,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         final MessagesController.DialogFilter filter = filters.get(a);
                         filterTabsView.addTab(a, filter.localId, filter.name, filter.entities, filter.title_noanimate, false, filters.get(a).locked);
                     }
+                }
+                if (showSkinUnreadTab()) {
+                    filterTabsView.addLocalTab(SKIN_UNREAD_TAB_ID, SKIN_UNREAD_TAB_STABLE_ID, LocaleController.getString(R.string.SkinListUnread));
                 }
                 if (stableId >= 0) {
                     if (selectWithStableId) {
@@ -6870,7 +6897,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
                 for (int a = 0; a < viewPages.length; a++) {
-                    if (viewPages[a].selectedType >= filters.size()) {
+                    if (viewPages[a].selectedType >= filters.size() && viewPages[a].selectedType != SKIN_UNREAD_TAB_ID) {
                         viewPages[a].selectedType = filters.size() - 1;
                     }
                     viewPages[a].listView.setScrollingTouchSlop(RecyclerView.TOUCH_SLOP_PAGING);
@@ -7205,6 +7232,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             actionBar.setTitle(getString(R.string.UnreadDialogsTitle));
             return;
         }
+        if (SkinStyle.chatList() && hasMainTabs) {
+            logoDrawable = null;
+            updateSkinTitle(true);
+            updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
+            return;
+        }
         String customTitle = getMessagesController().getDialogsTitleText();
         if (TextUtils.isEmpty(customTitle)) {
             logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo_2).mutate();
@@ -7218,6 +7251,58 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             actionBar.setTitle(customTitle, statusDrawable);
         }
         updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
+    }
+
+    private int skinUnreadChats = -1;
+    private int skinConnectionState = -1;
+
+    private boolean showSkinUnreadTab() {
+        return SkinStyle.chatList() && hasMainTabs && initialDialogsType == DIALOGS_TYPE_DEFAULT && folderId == 0 && !onlySelect;
+    }
+
+    private int skinUnreadChats() {
+        if (skinUnreadChats < 0) {
+            skinUnreadChats = getUnreadUnmutedDialogs(getMessagesController(), 0).size();
+        }
+        return skinUnreadChats;
+    }
+
+    /**
+     * The skin's title: 对话 in the serif with the number of unread chats in
+     * light figures, the same chats the 未读 tab lists. While the connection
+     * is not up, its state shows under the title.
+     */
+    private void updateSkinTitle(boolean force) {
+        if (actionBar == null) {
+            return;
+        }
+        final int unreadChats = getUnreadUnmutedDialogs(getMessagesController(), 0).size();
+        final int state = getConnectionsManager().getConnectionState();
+        if (!force && unreadChats == skinUnreadChats && state == skinConnectionState) {
+            return;
+        }
+        final boolean countChanged = unreadChats != skinUnreadChats;
+        skinUnreadChats = unreadChats;
+        skinConnectionState = state;
+
+        final String customTitle = getMessagesController().getDialogsTitleText();
+        final SpannableStringBuilder title = new SpannableStringBuilder(TextUtils.isEmpty(customTitle) ? SkinBridge.text(R.string.SkinTabChats, R.string.MainTabsChats) : customTitle);
+        if (unreadChats > 0) {
+            final int start = title.length();
+            title.append("  ").append(LocaleController.formatNumber(unreadChats, ','));
+            title.setSpan(new SkinStyle.TypefaceSpan(SkinStyle.numerals(true), "tnum"), start, title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            title.setSpan(new RelativeSizeSpan(0.82f), start, title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            title.setSpan(new ForegroundColorSpanThemable(Theme.key_chats_message, resourceProvider), start, title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        final boolean connected = state == ConnectionsManager.ConnectionStateConnected;
+        actionBar.setTitle(title, statusDrawable);
+        actionBar.getTitleTextView().setTypeface(SkinStyle.serif());
+        actionBar.setSubtitle(connected ? null : SkinBridge.connectionStatus(currentAccount));
+        // The bar's own sizing takes over while the status line needs the room.
+        actionBar.setTitleTextSizeOverride(connected ? 24 : 0);
+        if (countChanged && filterTabsView != null && showSkinUnreadTab()) {
+            filterTabsView.notifyTabCounterChanged(SKIN_UNREAD_TAB_ID);
+        }
     }
 
     @Override
@@ -9882,7 +9967,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
         }
         if (removeFromFolderItem != null) {
-            boolean cantRemoveFromFolder = filterTabsView == null || filterTabsView.getVisibility() != View.VISIBLE || filterTabsView.currentTabIsDefault();
+            // The skin's 未读 tab is not a folder, so there is nothing to remove a chat from.
+            boolean cantRemoveFromFolder = filterTabsView == null || filterTabsView.getVisibility() != View.VISIBLE || filterTabsView.currentTabIsDefault() || viewPages[0].selectedType == SKIN_UNREAD_TAB_ID;
             if (!cantRemoveFromFolder) {
                 try {
                     final int dialogsCount = getDialogsArray(currentAccount, viewPages[0].dialogsAdapter.getDialogsType(), folderId, dialogsListFrozen).size();
@@ -10456,6 +10542,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @SuppressWarnings("unchecked")
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
+        if (SkinStyle.chatList() && hasMainTabs && actionBar != null && (id == NotificationCenter.dialogsNeedReload || id == NotificationCenter.didUpdateConnectionState
+                || id == NotificationCenter.notificationsSettingsUpdated
+                || id == NotificationCenter.updateInterfaces && args.length > 0 && args[0] instanceof Integer
+                    && ((Integer) args[0] & (MessagesController.UPDATE_MASK_NEW_MESSAGE | MessagesController.UPDATE_MASK_READ_DIALOG_MESSAGE)) != 0)) {
+            updateSkinTitle(false);
+        }
         if (id == NotificationCenter.dialogsNeedReload) {
             if (viewPages == null || dialogsListFrozen) {
                 return;
@@ -10918,6 +11010,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     public static final int DIALOGS_TYPE_BOT_REQUEST_PEER = 15;
     public static final int DIALOGS_TYPE_BOT_SELECT_VERIFY = 16;
     public static final int DIALOGS_TYPE_UNREAD_UNMUTED = 17;
+
+    // The skin's 未读 category: a tab after the folders listing unread, unmuted chats.
+    private static final int SKIN_UNREAD_TAB_ID = 10_000;
+    private static final int SKIN_UNREAD_TAB_STABLE_ID = Integer.MAX_VALUE - 10_000;
 
     private ArrayList<TLRPC.Dialog> botShareDialogs;
 

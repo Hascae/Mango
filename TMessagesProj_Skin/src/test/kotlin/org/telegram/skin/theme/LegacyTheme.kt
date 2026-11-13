@@ -213,6 +213,9 @@ internal fun designOverrides(c: SkinColors): Map<String, Color?> {
         put("actionBarDefault", c.page)
         put("actionBarDefaultIcon", c.text)
         put("actionBarDefaultTitle", c.text)
+        // The chat list's title (the logo, or 对话 in the skin) has a colour of its own,
+        // missing from the stock theme files and so falling back to Telegram blue.
+        put("telegram_color_dialogsLogo", c.text)
         put("actionBarDefaultSubtitle", c.textSecondary)
         put("actionBarDefaultSelector", selection)
         put("actionBarDefaultSearch", c.text)

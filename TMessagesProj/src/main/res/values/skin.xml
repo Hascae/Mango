@@ -72,4 +72,5 @@
     <string name="SkinSetMore">More settings</string>
     <string name="SkinNoticeFrozen">Your account is frozen. Tap for details</string>
     <string name="SkinNoticeSuggestion">Settings has a reminder for you</string>
+    <string name="SkinListUnread">Unread</string>
 </resources>

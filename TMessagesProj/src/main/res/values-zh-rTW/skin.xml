@@ -72,4 +72,5 @@
     <string name="SkinSetMore">更多設定</string>
     <string name="SkinNoticeFrozen">你的帳號已被凍結，點此了解詳情</string>
     <string name="SkinNoticeSuggestion">設定裡有一則提醒</string>
+    <string name="SkinListUnread">未讀</string>
 </resources>

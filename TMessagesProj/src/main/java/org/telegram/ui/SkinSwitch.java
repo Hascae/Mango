@@ -8,6 +8,9 @@ public final class SkinSwitch {
     /** The tab screen: the aluminium dock and its pages, 我 among them, in place of the glass bar. */
     public static final boolean MAIN_TABS = true;
 
+    /** The chat list keeps Telegram's engine and draws its rows, tabs and header in the skin's style. */
+    public static final boolean CHAT_LIST = true;
+
     private SkinSwitch() {
     }
 }

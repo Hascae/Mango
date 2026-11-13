@@ -139,6 +139,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Stack;
+import org.telegram.ui.SkinStyle;
 
 public class DialogCell extends BaseCell implements StoriesListPlaceProvider.AvatarOverlaysView {
 
@@ -198,6 +199,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     public DialogCellTags tags;
 
     public final StoriesUtilities.AvatarStoryParams storyParams = new StoriesUtilities.AvatarStoryParams(false) {
+        {
+            squircle = SkinStyle.chatList();
+        }
+
         @Override
         public void openStory(long dialogId, Runnable onDone) {
             if (delegate == null) {
@@ -644,7 +649,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         parentFragment = fragment;
         Theme.createDialogsResources(context);
         drawMonoforumAvatar = false;
-        avatarImage.setRoundRadius(dp(28));
+        avatarImage.setRoundRadius(avatarRoundRadius());
         for (int i = 0; i < thumbImage.length; ++i) {
             thumbImage[i] = new ImageReceiver(this);
             thumbImage[i].setCurrentAccount(account);
@@ -1142,6 +1147,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private static final float BADGE_TEXT_MIN_WIDTH = 8f;
     private static final float BADGE_GAP = 25 - BADGE_TEXT_MIN_WIDTH;
     private static final float BADGE_MARGIN = 15.666f;
+    // Room the skin's status light takes beside an unread count.
+    private static final float SKIN_LED_ROOM = 10;
 
 
     private static final float BADGE_DRAWABLE_SIZE = 16;
@@ -2396,15 +2403,16 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 messageNameLeft += w;
             }
         } else if (countString != null || mentionString != null || drawReactionMention) {
+            final int ledRoom = skinCounter() ? dp(SKIN_LED_ROOM) : 0;
             if (countString != null) {
                 countWidth = Math.max(dp(BADGE_TEXT_MIN_WIDTH), (int) Math.ceil(Theme.dialogs_countTextPaint2.measureText(countString)));
                 countLayout = new StaticLayout(countString, Theme.dialogs_countTextPaint2, countWidth, Layout.Alignment.ALIGN_CENTER, 1.0f, 0.0f, false);
-                int w = countWidth + dp(BADGE_GAP);
+                int w = countWidth + dp(BADGE_GAP) + ledRoom;
                 messageWidth -= w;
                 if (!LocaleController.isRTL) {
-                    countLeft = getMeasuredWidth() - dp(BADGE_MARGIN) - (countWidth + dp(BADGE_TEXT_PADDING * 2));
+                    countLeft = getMeasuredWidth() - dp(BADGE_MARGIN) - ledRoom - (countWidth + dp(BADGE_TEXT_PADDING * 2));
                 } else {
-                    countLeft = dp(BADGE_MARGIN);
+                    countLeft = dp(BADGE_MARGIN) + ledRoom;
                     messageLeft += w;
                     typingLeft += w;
                     buttonLeft += w;
@@ -2424,9 +2432,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 int w = mentionWidth + dp(BADGE_GAP);
                 messageWidth -= w;
                 if (!LocaleController.isRTL) {
-                    mentionLeft = getMeasuredWidth() - (mentionWidth + dp(BADGE_TEXT_PADDING * 2)) - dp(BADGE_MARGIN) - (countWidth != 0 ? countWidth + dp(BADGE_GAP) : 0);
+                    mentionLeft = getMeasuredWidth() - (mentionWidth + dp(BADGE_TEXT_PADDING * 2)) - dp(BADGE_MARGIN) - (countWidth != 0 ? countWidth + dp(BADGE_GAP) + ledRoom : 0);
                 } else {
-                    mentionLeft = dp(BADGE_MARGIN) + (countWidth != 0 ? countWidth + dp(BADGE_GAP) : 0);
+                    mentionLeft = dp(BADGE_MARGIN) + (countWidth != 0 ? countWidth + dp(BADGE_GAP) + ledRoom : 0);
                     messageLeft += w;
                     typingLeft += w;
                     buttonLeft += w;
@@ -2445,7 +2453,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         reactionMentionLeft -= (mentionWidth != 0 ? (mentionWidth + dp(BADGE_GAP)) : 0);
                     }
                     if (drawCount) {
-                        reactionMentionLeft -= (countWidth != 0 ? countWidth + dp(BADGE_GAP) : 0);
+                        reactionMentionLeft -= (countWidth != 0 ? countWidth + dp(BADGE_GAP) + ledRoom : 0);
                     }
                 } else {
                     reactionMentionLeft = dp(BADGE_MARGIN);
@@ -2453,7 +2461,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         reactionMentionLeft += (mentionWidth != 0 ? (mentionWidth + dp(BADGE_GAP)) : 0);
                     }
                     if (drawCount) {
-                        reactionMentionLeft += (countWidth != 0 ? (countWidth + dp(BADGE_GAP)) : 0);
+                        reactionMentionLeft += (countWidth != 0 ? (countWidth + dp(BADGE_GAP) + ledRoom) : 0);
                     }
                     messageLeft += w;
                     typingLeft += w;
@@ -3086,7 +3094,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 thumbImage[i].setImageBitmap((BitmapDrawable) null);
             }
             drawMonoforumAvatar = false;
-            avatarImage.setRoundRadius(dp(28));
+            avatarImage.setRoundRadius(avatarRoundRadius());
             drawUnmute = false;
         } else {
             int oldUnreadCount = unreadCount;
@@ -3509,7 +3517,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 reactionsMentionsAnimator.start();
             }
             drawMonoforumAvatar = !isFolderCell() && chat != null && chat.monoforum;
-            avatarImage.setRoundRadius(drawMonoforumAvatar ? 1 : chat != null && chat.forum && currentDialogFolderId == 0 && !useFromUserAsAvatar || !isSavedDialog && user != null && user.self && MessagesController.getInstance(currentAccount).savedViewAsChats ? dp(16) : dp(28));
+            avatarImage.setRoundRadius(drawMonoforumAvatar ? 1 : chat != null && chat.forum && currentDialogFolderId == 0 && !useFromUserAsAvatar || !isSavedDialog && user != null && user.self && MessagesController.getInstance(currentAccount).savedViewAsChats ? dp(16) : avatarRoundRadius());
         }
         if (!isTopic && (getMeasuredWidth() != 0 || getMeasuredHeight() != 0)) {
             rebuildLayout = true;
@@ -4348,7 +4356,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             } else if ((drawCount || drawMention) && drawCount2 || countChangeProgress != 1f || drawReactionMention || reactionsMentionsChangeProgress != 1f) {
                 final boolean drawCounterMuted = isCounterMuted();
                 drawCounter(canvas, drawCounterMuted, countTop, countLeft, countLeftOld, 1f, false);
-                if (drawMention) {
+                if (drawMention && skinCounter() && mentionLayout == null) {
+                    rect.set(mentionLeft, countTop, mentionLeft + mentionWidth + dp(BADGE_TEXT_PADDING * 2), countTop + dp(BADGE_SIZE));
+                    final int color = Theme.getColor(drawCounterMuted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_unreadCounter, resourcesProvider);
+                    SkinStyle.drawSeal(canvas, rect, "@", null, color, 1.0f - reorderIconProgress);
+                } else if (drawMention) {
                     Theme.dialogs_countPaint.setAlpha((int) ((1.0f - reorderIconProgress) * 255));
 
                     int x = mentionLeft;
@@ -4383,10 +4395,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         float s = drawReactionMention ? reactionsMentionsChangeProgress : (1f - reactionsMentionsChangeProgress);
                         canvas.scale(s, s, rect.centerX(),  rect.centerY());
                     }
-                    canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, paint);
-                    Theme.dialogs_reactionsMentionDrawable.setAlpha((int) ((1.0f - reorderIconProgress) * 255));
-                    setDrawableBounds(Theme.dialogs_reactionsMentionDrawable, reactionMentionLeft + dp(BADGE_DRAWABLE_OFFSET), countTop + dp(BADGE_DRAWABLE_OFFSET), dp(BADGE_DRAWABLE_SIZE), dp(BADGE_DRAWABLE_SIZE));
-                    Theme.dialogs_reactionsMentionDrawable.draw(canvas);
+                    if (skinCounter()) {
+                        SkinStyle.drawSeal(canvas, rect, null, skinReactionIcon(), Theme.getColor(Theme.key_chats_unreadCounter, resourcesProvider), 1.0f - reorderIconProgress);
+                    } else {
+                        canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, paint);
+                        Theme.dialogs_reactionsMentionDrawable.setAlpha((int) ((1.0f - reorderIconProgress) * 255));
+                        setDrawableBounds(Theme.dialogs_reactionsMentionDrawable, reactionMentionLeft + dp(BADGE_DRAWABLE_OFFSET), countTop + dp(BADGE_DRAWABLE_OFFSET), dp(BADGE_DRAWABLE_SIZE), dp(BADGE_DRAWABLE_SIZE));
+                        Theme.dialogs_reactionsMentionDrawable.draw(canvas);
+                    }
                     canvas.restore();
                 }
             } else if (openBot) {
@@ -4852,6 +4868,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     } else {
                         left = (int) (storyParams.originalAvatarRect.right - dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 10 : 6));
                     }
+                    if (SkinStyle.chatList()) {
+                        // A rounded square's corner sits further out than a circle's edge.
+                        top = (int) (storyParams.originalAvatarRect.bottom - dp(5));
+                        left = (int) (LocaleController.isRTL ? storyParams.originalAvatarRect.left + dp(5) : storyParams.originalAvatarRect.right - dp(5));
+                    }
 
                     Theme.dialogs_onlineCirclePaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider));
                     canvas.drawCircle(left, top, dp(7) * onlineProgress, Theme.dialogs_onlineCirclePaint);
@@ -4885,6 +4906,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         left = (int) (storyParams.originalAvatarRect.left + dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 10 : 6));
                     } else {
                         left = (int) (storyParams.originalAvatarRect.right - dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 10 : 6));
+                    }
+                    if (SkinStyle.chatList()) {
+                        // A rounded square's corner sits further out than a circle's edge.
+                        top = (int) (storyParams.originalAvatarRect.bottom - dp(5));
+                        left = (int) (LocaleController.isRTL ? storyParams.originalAvatarRect.left + dp(5) : storyParams.originalAvatarRect.right - dp(5));
                     }
 
                     if (rightFragmentOpenedProgress != 0) {
@@ -5014,11 +5040,16 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     private void drawCounter(Canvas canvas, boolean drawCounterMuted, int countTop, int countLeftLocal, int countLeftOld, float globalScale, boolean outline) {
         final boolean drawBubble = isForumCell() || isFolderCell();
+        final boolean skin = skinCounter() && !outline;
         if (drawCount && drawCount2 || countChangeProgress != 1f) {
             final float progressFinal = (unreadCount == 0 && !markUnread) ? 1f - countChangeProgress : countChangeProgress;
             Paint paint;
             int fillPaintAlpha = 255;
             boolean restoreCountTextPaint = false;
+            if (skin) {
+                Theme.dialogs_countTextPaint2.setColor(Theme.getColor(drawCounterMuted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_message, resourcesProvider));
+                restoreCountTextPaint = true;
+            }
             if (outline) {
                 if (counterPaintOutline == null) {
                     counterPaintOutline = new Paint();
@@ -5080,7 +5111,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     if (outline) {
                         canvas.drawPath(counterPath, counterPaintOutline);
                     }
-                } else {
+                } else if (!skin) {
                     canvas.drawRoundRect(rect, dp(11.5f), dp(11.5f), paint);
                     if (outline) {
                         canvas.drawRoundRect(rect, dp(11.5f), dp(11.5f), counterPaintOutline);
@@ -5132,7 +5163,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     if (outline) {
                         canvas.drawPath(counterPath, counterPaintOutline);
                     }
-                } else {
+                } else if (!skin) {
                     canvas.drawRoundRect(rect, dp(11.5f), dp(11.5f), paint);
                     if (outline) {
                         canvas.drawRoundRect(rect, dp(11.5f), dp(11.5f), counterPaintOutline);
@@ -5169,10 +5200,40 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 Theme.dialogs_countTextPaint2.setAlpha(textAlpha);
                 canvas.restore();
             }
+            if (skin) {
+                // The light sits in the room left for it at the end of the row.
+                final float ledX = LocaleController.isRTL ? countLeftLocal - dp(SKIN_LED_ROOM) + dp(4) : countLeftLocal + countWidth + dp(BADGE_TEXT_PADDING * 2) + dp(SKIN_LED_ROOM) - dp(4);
+                SkinStyle.drawLed(canvas, ledX, countTop + dp(BADGE_SIZE) / 2f, !drawCounterMuted,
+                        Theme.getColor(Theme.key_chats_onlineCircle, resourcesProvider),
+                        Theme.getColor(Theme.key_chats_unreadCounterMuted, resourcesProvider),
+                        progressFinal * (1.0f - reorderIconProgress));
+            }
             if (restoreCountTextPaint) {
                 Theme.dialogs_countTextPaint2.setColor(Theme.getColor(Theme.key_chats_unreadCounterText));
             }
         }
+    }
+
+    // The skin's chat list draws plain counters with a status light; forum
+    // and folder rows keep their bubbles, which carry other meaning.
+    private boolean skinCounter() {
+        return SkinStyle.chatList() && !isForumCell() && !isFolderCell();
+    }
+
+    private int avatarRoundRadius() {
+        return SkinStyle.chatList() ? SkinStyle.avatarRadius(dp(56)) : dp(28);
+    }
+
+    private Drawable skinReactionDrawable;
+
+    private Drawable skinReactionIcon() {
+        if (skinReactionDrawable == null && Theme.dialogs_reactionsMentionDrawable.getConstantState() != null) {
+            skinReactionDrawable = Theme.dialogs_reactionsMentionDrawable.getConstantState().newDrawable().mutate();
+        }
+        if (skinReactionDrawable != null) {
+            skinReactionDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_chats_unreadCounter, resourcesProvider), PorterDuff.Mode.SRC_IN));
+        }
+        return skinReactionDrawable;
     }
 
     private void createStatusDrawableAnimator(int lastStatusDrawableParams, int currentStatus) {
