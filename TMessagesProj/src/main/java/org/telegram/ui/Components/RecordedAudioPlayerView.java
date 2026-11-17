@@ -20,6 +20,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.skin.motion.SkinMotion;
 import org.telegram.skin.theme.CanvasMaterials;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.SkinMetal;
@@ -277,6 +278,12 @@ public class RecordedAudioPlayerView extends View {
         checkWaveform();
 
         canvas.save();
+        // On the skin the record circle opens into the well (Telegram's own morph of [rect]),
+        // the engraved waveform rises out of its centre line, and only then are the porcelain
+        // handles, the metal cap and the duration set in.
+        final float waveRise = m != null ? SkinMotion.MORPH.getInterpolator().getInterpolation(clamp01(transitionProgress / 0.7f)) : 1f;
+        final float fittings = m != null ? SkinMotion.STATE.getInterpolator().getInterpolation(clamp01((transitionProgress - 0.55f) / 0.45f)) : 1f;
+
         clipPath.rewind();
         final float clipRadius = m != null ? rect.height() / 2f : dp(8);
         clipPath.addRoundRect(rect, clipRadius, clipRadius, Path.Direction.CW);
@@ -287,6 +294,7 @@ public class RecordedAudioPlayerView extends View {
 
         canvas.save();
         canvas.translate(track.left + dp(14), rect.centerY());
+        canvas.scale(1f, waveRise);
         waveformPaint.setColor(m != null ? Theme.multAlpha(m.textTertiary, 0.35f) : Theme.multAlpha(normal, 0.3f));
         canvas.drawPath(waveformPath, waveformPaint);
         canvas.restore();
@@ -299,6 +307,7 @@ public class RecordedAudioPlayerView extends View {
             canvas.save();
             canvas.clipRect(progressX, rect.top, right, rect.bottom);
             canvas.translate(track.left + dp(14), rect.centerY());
+            canvas.scale(1f, waveRise);
             waveformPaint.setColor(!wasPlaying || progress >= this.left || progressPressed ? normal : lit);
             canvas.drawPath(waveformPath, waveformPaint);
             canvas.restore();
@@ -307,6 +316,7 @@ public class RecordedAudioPlayerView extends View {
             canvas.save();
             canvas.clipRect(left, rect.top, progressX, rect.bottom);
             canvas.translate(track.left + dp(14), rect.centerY());
+            canvas.scale(1f, waveRise);
             waveformPaint.setColor(isPlaying() || wasPlaying || progressPressed ? lit : normal);
             canvas.drawPath(waveformPath, waveformPaint);
             canvas.restore();
@@ -315,9 +325,9 @@ public class RecordedAudioPlayerView extends View {
         if (m != null) {
             // Porcelain handles at the trim's ends, short enough to clear the well's rounded ends.
             handleRect.set(left - dp(7), rect.centerY() - dp(9.5f), left - dp(2), rect.centerY() + dp(9.5f));
-            SkinMetal.drawPorcelain(canvas, handleRect, dp(2.5f), m, false, 1f);
+            SkinMetal.drawPorcelain(canvas, handleRect, dp(2.5f), m, false, fittings);
             handleRect.set(right + dp(2), rect.centerY() - dp(9.5f), right + dp(7), rect.centerY() + dp(9.5f));
-            SkinMetal.drawPorcelain(canvas, handleRect, dp(2.5f), m, false, 1f);
+            SkinMetal.drawPorcelain(canvas, handleRect, dp(2.5f), m, false, fittings);
         } else {
             handleRect.set(left - dp(7), rect.centerY() - dp(5.33f), left - dp(5.33f), rect.centerY() + dp(5.33f));
             canvas.drawRoundRect(handleRect, handleRect.width() / 2f, handleRect.width() / 2f, handlePaint);
@@ -333,21 +343,21 @@ public class RecordedAudioPlayerView extends View {
             final float r = Math.min(dp(13), rect.height() / 2f - dp(2));
             final float cx = rect.left + dp(4) + r;
             final float cy = rect.centerY();
-            SkinMetal.drawKnob(canvas, cx, cy, r, false, m, 1f);
+            SkinMetal.drawKnob(canvas, cx, cy, r, false, m, fittings);
             badgeClickRect.set(cx - r, cy - r, cx + r, cy + r);
             badgeClickRect.inset(-dp(6), -dp(6));
             final int sz = dp(12);
             canvas.save();
             canvas.translate(cx - sz / 2f, cy);
             playPauseDrawable.setBounds(0, -sz / 2, sz, sz / 2);
-            playPauseDrawable.setAlpha(0xFF);
+            playPauseDrawable.setAlpha((int) (0xFF * fittings));
             playPauseDrawable.draw(canvas);
             canvas.restore();
 
             canvas.save();
             canvas.translate(rect.right - dp(8) - text.getCurrentWidth(), cy - dp(1));
             text.setBounds(-1, -1, 1, 1);
-            text.setAlpha(0xFF);
+            text.setAlpha((int) (0xFF * fittings));
             text.draw(canvas);
             canvas.restore();
             canvas.restore();
