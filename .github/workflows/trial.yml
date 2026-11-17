@@ -37,7 +37,7 @@ jobs:
         run: |
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sdkmanager" --licenses > /dev/null
-          "$sdkmanager" "platforms;android-37" "build-tools;37.0.0" "ndk;30.0.16248370" "cmake;4.1.2" > /dev/null
+          "$sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" "ndk;30.0.16248370" "cmake;4.1.2" > /dev/null
 
       - name: Put the signing key, the API credentials and a placeholder services file in place
         env:
