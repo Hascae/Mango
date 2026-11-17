@@ -155,9 +155,10 @@ public class ExtensionFeaturesActivity extends BaseFragment {
 
         final CanvasMaterials skin = SkinSwitch.MANGO_PAGES ? SkinMetal.materials(Theme.getColor(Theme.key_windowBackgroundWhite, resourceProvider)) : null;
         FrameLayout searchContainer = new FrameLayout(context);
-        if (skin != null) {
+        final SkinKeys.Well searchWell = skin != null ? SkinKeys.well(skin, 14) : null;
+        if (searchWell != null) {
             // The search sits in a well sunk into the page, as the input console's field does.
-            searchContainer.setBackground(SkinKeys.well(skin, 14));
+            searchContainer.setBackground(searchWell);
         } else {
             searchContainer.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(12),
                     Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider)));
@@ -186,6 +187,9 @@ public class ExtensionFeaturesActivity extends BaseFragment {
         searchField.setPadding(0, 0, 0, 0);
         searchField.setLayoutDirection(LocaleController.isRTL ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         searchField.setImeOptions(EditorInfo.IME_ACTION_SEARCH | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        if (searchWell != null) {
+            searchField.setOnFocusChangeListener((v, hasFocus) -> searchWell.setFocused(hasFocus));
+        }
         searchContainer.addView(searchField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT,
                 Gravity.FILL, 44, 0, 44, 0));
 

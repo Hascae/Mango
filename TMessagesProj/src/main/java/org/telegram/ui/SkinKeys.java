@@ -2,7 +2,6 @@ package org.telegram.ui;
 
 import static org.telegram.messenger.AndroidUtilities.dpf2;
 
-import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
@@ -14,7 +13,6 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.RippleDrawable;
 import android.os.SystemClock;
 import android.view.View;
 
@@ -24,7 +22,6 @@ import androidx.annotation.Nullable;
 import org.telegram.skin.motion.SkinHaptics;
 import org.telegram.skin.motion.SkinMotion;
 import org.telegram.skin.theme.CanvasMaterials;
-import org.telegram.ui.ActionBar.Theme;
 
 import java.util.ArrayList;
 
@@ -221,18 +218,8 @@ public final class SkinKeys {
     }
 
     /** A search field's ground: a well sunk into the metal, corner radius [radiusDp]. */
-    public static Drawable well(CanvasMaterials m, float radiusDp) {
+    public static Well well(CanvasMaterials m, float radiusDp) {
         return new Well(m, radiusDp);
-    }
-
-    /**
-     * A page's button: the main action as porcelain, any other as an aluminium
-     * key, with a press ripple in the key's own ink.
-     */
-    public static Drawable button(CanvasMaterials m, boolean main, float radiusDp) {
-        final Drawable key = new Key(m, main, radiusDp);
-        final int ink = main ? m.porcelainText : m.text;
-        return new RippleDrawable(ColorStateList.valueOf(Theme.multAlpha(ink, 0.12f)), key, null);
     }
 
     private abstract static class Base extends Drawable {
@@ -321,42 +308,60 @@ public final class SkinKeys {
         }
     }
 
-    private static final class Well extends Base {
+    /** The well; while its field has focus, its rim catches the celadon light. */
+    public static final class Well extends Base {
         private final RectF rect = new RectF();
+        private final Paint rimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final float radiusDp;
+        private boolean focused;
+        private float fromLight;
+        private long since;
 
         Well(CanvasMaterials m, float radiusDp) {
             super(m);
             this.radiusDp = radiusDp;
+            rimPaint.setStyle(Paint.Style.STROKE);
         }
 
-        @Override
-        public void draw(@NonNull Canvas canvas) {
-            rect.set(getBounds());
-            SkinMetal.drawWell(canvas, rect, Math.min(dpf2(radiusDp), rect.height() / 2f), m, alpha / 255f);
+        /** Lights the rim as the field takes focus (on the glaze curve) and lets it go out when it loses it. */
+        public void setFocused(boolean focused) {
+            if (this.focused == focused) {
+                return;
+            }
+            final long now = SystemClock.uptimeMillis();
+            fromLight = light(now);
+            this.focused = focused;
+            since = SkinMotion.reduced() ? now - 1000 : now;
+            invalidateSelf();
         }
-    }
 
-    private static final class Key extends Base {
-        private final RectF rect = new RectF();
-        private final boolean porcelain;
-        private final float radiusDp;
-
-        Key(CanvasMaterials m, boolean porcelain, float radiusDp) {
-            super(m);
-            this.porcelain = porcelain;
-            this.radiusDp = radiusDp;
+        private float light(long now) {
+            final float t = now - since;
+            if (focused) {
+                final float f = Math.min(1f, t / SkinMotion.GLAZE_MS);
+                return fromLight + (1f - fromLight) * SkinMotion.GLAZE.getInterpolator().getInterpolation(f);
+            }
+            final float f = Math.min(1f, t / SkinMotion.EXIT_MS);
+            return fromLight * (1f - SkinMotion.EXIT.getInterpolator().getInterpolation(f));
         }
 
         @Override
         public void draw(@NonNull Canvas canvas) {
             rect.set(getBounds());
             final float radius = Math.min(dpf2(radiusDp), rect.height() / 2f);
-            if (porcelain) {
-                SkinMetal.drawPorcelain(canvas, rect, radius, m, true, alpha / 255f);
-            } else {
-                rect.inset(0, dpf2(1));
-                SkinMetal.drawKey(canvas, rect, radius, m, alpha / 255f);
+            SkinMetal.drawWell(canvas, rect, radius, m, alpha / 255f);
+            final long now = SystemClock.uptimeMillis();
+            final float light = light(now);
+            if (light > 0f) {
+                final float px = dpf2(1);
+                rimPaint.setStrokeWidth(px);
+                rimPaint.setColor(m.led);
+                rimPaint.setAlpha((int) (Color.alpha(m.led) * light * alpha / 255f));
+                rect.inset(px / 2, px / 2);
+                canvas.drawRoundRect(rect, radius - px / 2, radius - px / 2, rimPaint);
+            }
+            if (now - since < (focused ? SkinMotion.GLAZE_MS : SkinMotion.EXIT_MS)) {
+                invalidateSelf();
             }
         }
     }
