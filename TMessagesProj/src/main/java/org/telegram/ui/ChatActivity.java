@@ -8674,22 +8674,31 @@ public class ChatActivity extends BaseFragment implements
 
             @Override
             protected void onDraw(Canvas canvas) {
-                if (!SkinSwitch.CHAT_FRAME || !skinOverlayAccent || getLayoutTextWidth() == 0) {
+                // The porcelain glazes in under the label as Telegram's accent animates;
+                // the LED comes on with it and the label moves over to make room for it.
+                final float accent = SkinSwitch.CHAT_FRAME ? bottomChannelButtonsLayout.getCenterAccentFactor() : 0f;
+                if (accent <= 0f || getLayoutTextWidth() == 0) {
                     super.onDraw(canvas);
                     return;
                 }
                 final CanvasMaterials m = skinSlipMaterials();
                 final float led = dp(3.5f);
-                final float shift = led + dp(5);
+                final float shift = (led + dp(5)) * accent;
                 canvas.save();
                 canvas.translate(shift, 0);
                 super.onDraw(canvas);
                 canvas.restore();
                 final float cx = (getMeasuredWidth() - getLayoutTextWidth()) / 2f + shift - dp(10) - led;
-                SkinStyle.drawLed(canvas, cx, getMeasuredHeight() / 2f, led, true, m.led, m.textTertiary, 1f);
+                SkinStyle.drawLed(canvas, cx, getMeasuredHeight() / 2f, led, skinOverlayLed.glow(), 0f, m.led, m.textTertiary, accent);
+                if (skinOverlayLed.isMoving()) {
+                    invalidate();
+                }
             }
         };
         bottomChannelButtonsLayout.getContainer().addView(bottomOverlayChatText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, 0));
+        if (SkinSwitch.CHAT_FRAME) {
+            bottomChannelButtonsLayout.onCenterAccentFactorChanged = this::updateSkinOverlayInk;
+        }
         updateSkinOverlayColors();
         bottomOverlayChatText.setOnClickListener(view -> {
             if (getParentActivity() == null || pullingDownOffset != 0) {
@@ -11154,10 +11163,11 @@ public class ChatActivity extends BaseFragment implements
         return res;
     }
 
-    private boolean skinOverlayAccent;
     private boolean skinOverlayDanger;
+    private final SkinLed skinOverlayLed = new SkinLed();
     private final RectF skinPlateRect = new RectF();
     private Drawable skinPlateLock;
+    private int skinPlateLockColor;
 
     /** The cannot-send note as a plate engraved into the console, a padlock at its head. */
     private void drawSkinPlate(Canvas canvas, View plate) {
@@ -11167,7 +11177,10 @@ public class ChatActivity extends BaseFragment implements
         if (skinPlateLock == null) {
             skinPlateLock = ContextCompat.getDrawable(plate.getContext(), org.telegram.skin.R.drawable.skin_overlay_lock).mutate();
         }
-        skinPlateLock.setColorFilter(new PorterDuffColorFilter(m.textSecondary, PorterDuff.Mode.SRC_IN));
+        if (skinPlateLockColor != m.textSecondary) {
+            skinPlateLockColor = m.textSecondary;
+            skinPlateLock.setColorFilter(new PorterDuffColorFilter(skinPlateLockColor, PorterDuff.Mode.SRC_IN));
+        }
         final int size = dp(18);
         final int left = (int) skinPlateRect.left + dp(14);
         final int top = (plate.getHeight() - size) / 2;
@@ -11181,7 +11194,7 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         final CanvasMaterials m = skinSlipMaterials();
-        bottomOverlayChatText.setTextColorOverride(skinOverlayAccent ? m.porcelainText : skinOverlayDanger ? m.danger : m.text);
+        updateSkinOverlayInk();
         if (bottomOverlayText != null) {
             bottomOverlayText.setTextColor(m.textSecondary);
         }
@@ -11199,6 +11212,17 @@ public class ChatActivity extends BaseFragment implements
         if (bottomChannelButtonsLayout != null) {
             bottomChannelButtonsLayout.invalidate();
         }
+    }
+
+    /** The label's ink, turning from the metal's (or danger) to the porcelain's as the key becomes the accent one. */
+    private void updateSkinOverlayInk() {
+        if (!SkinSwitch.CHAT_FRAME || bottomOverlayChatText == null) {
+            return;
+        }
+        final CanvasMaterials m = skinSlipMaterials();
+        final int ink = skinOverlayDanger ? m.danger : m.text;
+        bottomOverlayChatText.setTextColorOverride(ColorUtils.blendARGB(ink, m.porcelainText, bottomChannelButtonsLayout.getCenterAccentFactor()));
+        bottomOverlayChatText.invalidate();
     }
 
     private int skinHeaderColor() {
@@ -28418,7 +28442,7 @@ public class ChatActivity extends BaseFragment implements
 
 
         bottomOverlayChatText.setTextColorKey(accentTextButton ? Theme.key_featuredStickers_buttonText : Theme.key_glass_defaultText);
-        skinOverlayAccent = accentTextButton;
+        skinOverlayLed.show(accentTextButton, animated);
         updateSkinOverlayColors();
 
         bottomChannelButtonsLayout.setCenterAccentBackground(accentTextButton, animated);

@@ -179,6 +179,14 @@ public class ChatActivityChannelButtonsLayout extends FrameLayout implements Fac
         animatorCenterAccentBackground.setValue(accent, animated);
     }
 
+    /** How far the centre key has turned into the accent key, 0 to 1. */
+    public float getCenterAccentFactor() {
+        return animatorCenterAccentBackground.getFloatValue();
+    }
+
+    /** Called on every step of that change, for ink drawn outside this layout. */
+    public Runnable onCenterAccentFactorChanged;
+
     private static final int VISIBILITY_ANIMATOR_ID = 1;
 
     private float totalVisibilityFactor;
@@ -194,6 +202,9 @@ public class ChatActivityChannelButtonsLayout extends FrameLayout implements Fac
     public void onFactorChanged(int id, float factor, float fraction, FactorAnimator callee) {
         if (id == CENTER_ACCENT_BACKGROUND_ANIMATOR_ID) {
             invalidate();
+            if (onCenterAccentFactorChanged != null) {
+                onCenterAccentFactorChanged.run();
+            }
             return;
         }
 
