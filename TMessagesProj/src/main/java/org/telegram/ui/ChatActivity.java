@@ -10749,6 +10749,8 @@ public class ChatActivity extends BaseFragment implements
             updateSkinSearchKeys();
             final Drawable closeGlyph = ContextCompat.getDrawable(getContext(), org.telegram.skin.R.drawable.skin_slip_close).mutate();
             skinSearchClose = new View(getContext()) {
+                private int closeGlyphColor;
+
                 @Override
                 protected void onDraw(Canvas canvas) {
                     final CanvasMaterials m = skinSlipMaterials();
@@ -10758,7 +10760,10 @@ public class ChatActivity extends BaseFragment implements
                     SkinMetal.drawGroove(canvas, dp(2), cy - dp(12), cy + dp(12), m, 1f);
                     SkinMetal.drawKnob(canvas, cx, cy, r, false, m, 1f);
                     final int half = dp(9);
-                    closeGlyph.setColorFilter(new PorterDuffColorFilter(m.text, PorterDuff.Mode.SRC_IN));
+                    if (closeGlyphColor != m.text) {
+                        closeGlyphColor = m.text;
+                        closeGlyph.setColorFilter(new PorterDuffColorFilter(closeGlyphColor, PorterDuff.Mode.SRC_IN));
+                    }
                     closeGlyph.setBounds((int) cx - half, (int) cy - half, (int) cx + half, (int) cy + half);
                     closeGlyph.draw(canvas);
                 }

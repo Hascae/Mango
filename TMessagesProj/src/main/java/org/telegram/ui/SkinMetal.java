@@ -52,19 +52,16 @@ public final class SkinMetal {
     private static CanvasMaterials capMaterials;
     private static CanvasMaterials recessMaterials;
     private static CanvasMaterials capsuleMaterials;
-    private static float capsuleTop;
-    private static float capsuleBottom;
+    private static float capsuleHeight;
     private static CanvasMaterials glazeMaterials;
-    private static float glazeTop;
-    private static float glazeBottom;
+    private static float glazeHeight;
     private static CanvasMaterials glazeRecessMaterials;
     private static float crackleWidth;
     private static float crackleHeight;
     private static final Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private static final Path keyPath = new Path();
     private static CanvasMaterials keyMaterials;
-    private static float keyTop;
-    private static float keyBottom;
+    private static float keyHeight;
 
     static {
         linePaint.setStyle(Paint.Style.STROKE);
@@ -171,15 +168,19 @@ public final class SkinMetal {
             shadowPaint.setShadowLayer(dpf2(4), 0, dpf2(2), m.castShadow);
             canvas.drawRoundRect(bounds, r, r, shadowPaint);
         }
-        if (capsuleMaterials != m || capsuleTop != bounds.top || capsuleBottom != bounds.bottom) {
+        final float h = bounds.height();
+        if (capsuleMaterials != m || capsuleHeight != h) {
             capsuleMaterials = m;
-            capsuleTop = bounds.top;
-            capsuleBottom = bounds.bottom;
-            capsulePaint.setShader(new LinearGradient(0, bounds.top, 0, bounds.bottom,
+            capsuleHeight = h;
+            capsulePaint.setShader(new LinearGradient(0, 0, 0, h,
                     new int[]{m.capLit, m.capMid, m.capShade}, null, Shader.TileMode.CLAMP));
         }
         capsulePaint.setAlpha((int) (255 * alpha));
-        canvas.drawRoundRect(bounds, r, r, capsulePaint);
+        // The gradient runs from the origin, so capsules at any height share it.
+        canvas.save();
+        canvas.translate(0, bounds.top);
+        canvas.drawRoundRect(bounds.left, 0, bounds.right, h, r, r, capsulePaint);
+        canvas.restore();
         final float inset = dpf2(0.5f);
         linePaint.setStrokeWidth(dpf2(1));
         linePaint.setColor(m.highlight);
@@ -228,15 +229,19 @@ public final class SkinMetal {
         if (bounds.isEmpty()) {
             return;
         }
-        if (glazeMaterials != m || glazeTop != bounds.top || glazeBottom != bounds.bottom) {
+        final float glazeH = bounds.height();
+        if (glazeMaterials != m || glazeHeight != glazeH) {
             glazeMaterials = m;
-            glazeTop = bounds.top;
-            glazeBottom = bounds.bottom;
-            glazePaint.setShader(new LinearGradient(0, bounds.top, 0, bounds.bottom,
+            glazeHeight = glazeH;
+            glazePaint.setShader(new LinearGradient(0, 0, 0, glazeH,
                     m.glazeTop, m.glazeBottom, Shader.TileMode.CLAMP));
         }
         glazePaint.setAlpha((int) (255 * alpha));
-        canvas.drawRoundRect(bounds, radius, radius, glazePaint);
+        // The gradient runs from the origin, so porcelain at any height shares it.
+        canvas.save();
+        canvas.translate(0, bounds.top);
+        canvas.drawRoundRect(bounds.left, 0, bounds.right, glazeH, radius, radius, glazePaint);
+        canvas.restore();
 
         porcelainPath.rewind();
         porcelainPath.addRoundRect(bounds, radius, radius, Path.Direction.CW);
@@ -301,15 +306,19 @@ public final class SkinMetal {
             shadowPaint.setShadowLayer(dpf2(3), 0, dpf2(1), ColorUtils.setAlphaComponent(m.castShadow, (int) (Color.alpha(m.castShadow) * Math.min(1f, shadow))));
             canvas.drawRoundRect(bounds, radius, radius, shadowPaint);
         }
-        if (keyMaterials != m || keyTop != bounds.top || keyBottom != bounds.bottom) {
+        final float keyH = bounds.height();
+        if (keyMaterials != m || keyHeight != keyH) {
             keyMaterials = m;
-            keyTop = bounds.top;
-            keyBottom = bounds.bottom;
-            keyPaint.setShader(new LinearGradient(0, bounds.top, 0, bounds.bottom,
+            keyHeight = keyH;
+            keyPaint.setShader(new LinearGradient(0, 0, 0, keyH,
                     new int[]{m.sheenTop, m.sheenMid, m.sheenBottom}, new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
         }
         keyPaint.setAlpha((int) (255 * alpha));
-        canvas.drawRoundRect(bounds, radius, radius, keyPaint);
+        // The gradient runs from the origin, so keys at any height share it.
+        canvas.save();
+        canvas.translate(0, bounds.top);
+        canvas.drawRoundRect(bounds.left, 0, bounds.right, keyH, radius, radius, keyPaint);
+        canvas.restore();
 
         keyPath.rewind();
         keyPath.addRoundRect(bounds, radius, radius, Path.Direction.CW);
