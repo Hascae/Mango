@@ -288,12 +288,17 @@ public final class SkinMetal {
      * a lit top edge, a cut along the bottom and, when opaque, a soft shadow.
      */
     public static void drawKey(Canvas canvas, RectF bounds, float radius, CanvasMaterials m, float alpha) {
+        drawKey(canvas, bounds, radius, m, alpha, 1f);
+    }
+
+    /** The key with its cast shadow at [shadow] strength: a key pressed into the slab casts none. */
+    public static void drawKey(Canvas canvas, RectF bounds, float radius, CanvasMaterials m, float alpha, float shadow) {
         if (bounds.isEmpty() || alpha <= 0) {
             return;
         }
-        if (alpha >= 1f) {
+        if (alpha >= 1f && shadow > 0f) {
             shadowPaint.setColor(m.sheenMid);
-            shadowPaint.setShadowLayer(dpf2(3), 0, dpf2(1), m.castShadow);
+            shadowPaint.setShadowLayer(dpf2(3), 0, dpf2(1), ColorUtils.setAlphaComponent(m.castShadow, (int) (Color.alpha(m.castShadow) * Math.min(1f, shadow))));
             canvas.drawRoundRect(bounds, radius, radius, shadowPaint);
         }
         if (keyMaterials != m || keyTop != bounds.top || keyBottom != bounds.bottom) {

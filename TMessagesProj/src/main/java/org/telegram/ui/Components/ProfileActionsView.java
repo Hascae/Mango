@@ -294,15 +294,21 @@ public class ProfileActionsView extends View {
             for (int i = 0; i < c; i++) {
                 Action action = actions.get(i);
                 if (!action.isDeleted) {
+                    if (SkinSwitch.PROFILE) {
+                        // Pressed, a key sinks into the slab: it shrinks with Telegram's bounce and its cast
+                        // shadow goes. The canvas scales it, so its sheen's gradient is not rebuilt every frame.
+                        final float scale = action.getScale();
+                        canvas.save();
+                        canvas.scale(scale, scale, action.rect.centerX(), action.rect.centerY());
+                        SkinMetal.drawKey(canvas, action.rect, r, skinMaterials(), action.getAlpha() * alphaFraction1, 1f - action.getPressed());
+                        canvas.restore();
+                        continue;
+                    }
                     AndroidUtilities.rectTmp.set(action.rect);
                     AndroidUtilities.rectTmp.inset(
                         action.rect.width() / 2.0f * (1.0f - action.getScale()),
                         action.rect.height() / 2.0f * (1.0f - action.getScale())
                     );
-                    if (SkinSwitch.PROFILE) {
-                        SkinMetal.drawKey(canvas, AndroidUtilities.rectTmp, r, skinMaterials(), action.getAlpha() * alphaFraction1);
-                        continue;
-                    }
                     int wasAlpha = paint.getAlpha();
                     int newAlpha = (int) (action.getAlpha() * alphaFraction1 * wasAlpha);
                     paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f : 1f)));
@@ -1194,6 +1200,11 @@ public class ProfileActionsView extends View {
 
         public float getScale() {
             return bounce.getScale(0.04f);
+        }
+
+        /** How far the key is pressed in, 0 to 1. */
+        public float getPressed() {
+            return bounce.isPressedProgress();
         }
 
         public void update(ActionButton button) {
