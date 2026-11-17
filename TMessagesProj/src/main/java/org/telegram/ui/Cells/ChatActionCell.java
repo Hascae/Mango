@@ -34,6 +34,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.SystemClock;
 import android.text.Layout;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -145,6 +146,7 @@ import org.telegram.ui.Stories.StoriesUtilities;
 import org.telegram.ui.Stories.UploadingDotsSpannable;
 import org.telegram.ui.Stories.recorder.HintView2;
 import org.telegram.ui.Stories.recorder.PreviewView;
+import org.telegram.skin.motion.SkinMotion;
 import org.telegram.ui.SkinStyle;
 import org.telegram.ui.SkinSwitch;
 
@@ -546,6 +548,7 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         if (customDate == date || customDate / 3600 == date / 3600) {
             return;
         }
+        final int previousDate = customDate;
         CharSequence newText;
         if (scheduled) {
             if (date == 0x7ffffffe) {
@@ -560,9 +563,49 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         if (customText != null && TextUtils.equals(newText, customText)) {
             return;
         }
+        if (SkinSwitch.CHAT_FRAME && previousDate != 0 && textLayout != null && wasLayout && isShown() && !SkinMotion.reduced()) {
+            // The skin's floating date rolls to the next day as its other figures roll.
+            skinRollingOut = textLayout;
+            skinRollingOutX = textXLeft;
+            skinRollStart = SystemClock.uptimeMillis();
+            skinRollOlder = date < previousDate;
+        }
         customText = newText;
         accessibilityText = null;
         updateTextInternal(inLayout);
+    }
+
+    private StaticLayout skinRollingOut;
+    private int skinRollingOutX;
+    private long skinRollStart;
+    private boolean skinRollOlder;
+
+    /**
+     * The floating date between two days: the old one leaves as the new one comes
+     * in, from above when scrolling back to an older day and from below otherwise.
+     */
+    private void drawSkinDateRoll(Canvas canvas) {
+        final float t = Math.min(1f, (SystemClock.uptimeMillis() - skinRollStart) / (float) SkinMotion.ROLL_MS);
+        final float p = SkinMotion.ROLL.getInterpolator().getInterpolation(t);
+        final float travel = textLayout.getHeight() * (skinRollOlder ? 1f : -1f);
+        final int alpha = textPaint.getAlpha();
+        canvas.save();
+        canvas.clipRect(0, textY, getWidth(), textY + textLayout.getHeight());
+        canvas.save();
+        canvas.translate(skinRollingOutX, textY + travel * p);
+        textPaint.setAlpha((int) (alpha * (1f - p)));
+        skinRollingOut.draw(canvas);
+        canvas.restore();
+        canvas.translate(textXLeft, textY - travel * (1f - p));
+        textPaint.setAlpha((int) (alpha * p));
+        textLayout.draw(canvas);
+        canvas.restore();
+        textPaint.setAlpha(alpha);
+        if (t < 1f) {
+            invalidate();
+        } else {
+            skinRollingOut = null;
+        }
     }
 
     private void updateTextInternal(boolean inLayout) {
@@ -2810,7 +2853,9 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
             }
         }
 
-        if (textPaint != null && textLayout != null) {
+        if (skinRollingOut != null && textPaint != null && textLayout != null && textLayout.getPaint() == textPaint) {
+            drawSkinDateRoll(canvas);
+        } else if (textPaint != null && textLayout != null) {
             canvas.save();
             canvas.translate(textXLeft, textY);
             if (textLayout.getPaint() != textPaint) {
