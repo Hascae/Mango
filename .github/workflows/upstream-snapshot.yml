@@ -1,0 +1,37 @@
+name: Official snapshot
+
+# Copies official Telegram releases into this repository as parentless
+# snapshot commits under tags, so a merge can use them without moving the
+# whole tree through a phone. Started by pushing a snapshot-request-* tag.
+on:
+  push:
+    tags: ['snapshot-request-*']
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push the official trees as snapshot tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q snap
+          cd snap
+          git config user.name "Official snapshot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add official https://github.com/DrKLO/Telegram.git
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          while read -r tag commit; do
+            git fetch -q --depth=1 official "$commit"
+            snapshot=$(git commit-tree "$commit^{tree}" -m "Official Telegram ${tag#official-} ($commit)")
+            git tag -f "$tag" "$snapshot"
+            git push -q origin "refs/tags/$tag"
+            echo "$tag -> $snapshot (tree of $commit)"
+          done <<'LIST'
+          official-12.5.1 ce8c61c47ec48a84014c8d1d0592f0e22a9dbb22
+          official-13.2.2 21f7d109da6ab3506c9e9577f98c6a38771ab335
+          LIST
