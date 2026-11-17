@@ -43,6 +43,7 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.skin.motion.SkinMotion;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationCenter;
@@ -370,6 +371,7 @@ public class ScrollSlidingTextTabStrip extends HorizontalScrollView implements T
 
         indicatorX = (int) (animateIndicatorStartX + (animateIndicatorToX - animateIndicatorStartX) * value);
         indicatorWidth = (int) (animateIndicatorStartWidth + (animateIndicatorToWidth - animateIndicatorStartWidth) * value);
+        skinBarProgress = value;
         invalidate();
     }
 
@@ -664,6 +666,8 @@ public class ScrollSlidingTextTabStrip extends HorizontalScrollView implements T
     private boolean skinBar;
     private final RectF skinBarRect = new RectF();
     private final Paint skinBarPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** Where the bar is between the tab it leaves and the one it goes to, by tap or by swipe. */
+    private float skinBarProgress = 1f;
 
     /** Marks the current tab with the skin's short celadon bar, as the chat list's folders do, instead of a pill behind it. */
     public void setSkinBar(boolean skinBar) {
@@ -781,7 +785,18 @@ public class ScrollSlidingTextTabStrip extends HorizontalScrollView implements T
             if (skinBar) {
                 final float centerX = getPaddingLeft() + (l + r) / 2f;
                 final float bottom = height - getPaddingBottom() - dp(1);
-                skinBarRect.set(centerX - dp(9), bottom - dp(3), centerX + dp(9), bottom);
+                float from = centerX;
+                float to = centerX;
+                if (skinBarProgress > 0f && skinBarProgress < 1f && !reordering && !SkinMotion.reduced()) {
+                    // Between two tabs the front end leads and the back end follows, so the bar
+                    // stretches across and gathers again at the new tab, as the folders' bar does.
+                    final float start = getPaddingLeft() + animateIndicatorStartX + animateIndicatorStartWidth / 2f;
+                    final float end = getPaddingLeft() + animateIndicatorToX + animateIndicatorToWidth / 2f;
+                    final float t = skinBarProgress;
+                    from = AndroidUtilities.lerp(start, end, t * t);
+                    to = AndroidUtilities.lerp(start, end, 1f - (1f - t) * (1f - t));
+                }
+                skinBarRect.set(Math.min(from, to) - dp(9), bottom - dp(3), Math.max(from, to) + dp(9), bottom);
                 skinBarPaint.setColor(processColor(Theme.getColor(tabLineColorKey, resourcesProvider)));
                 skinBarPaint.setAlpha((int) (skinBarPaint.getAlpha() * tabsContainer.getAlpha()));
                 canvas.drawRoundRect(skinBarRect, dp(1.5f), dp(1.5f), skinBarPaint);
