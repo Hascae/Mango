@@ -10585,8 +10585,9 @@ public class ChatActivity extends BaseFragment implements
         }
 
         searchExpandList = new AnimatedTextView(getContext(), true, false, true) {
-            private Drawable glyph;
-            private int glyphRes;
+            private Drawable glyph, rollingOut;
+            private int glyphRes, glyphColor;
+            private long rollStart;
 
             @Override
             protected void onDraw(Canvas canvas) {
@@ -10605,15 +10606,45 @@ public class ChatActivity extends BaseFragment implements
                     res = org.telegram.skin.R.drawable.skin_search_list;
                 }
                 if (glyph == null || glyphRes != res) {
+                    // A new glyph rolls up into the key like the result count beside it.
+                    rollingOut = glyph != null && isLaidOut() && !SkinMotion.reduced() ? glyph : null;
+                    rollStart = SystemClock.uptimeMillis();
                     glyphRes = res;
                     glyph = ContextCompat.getDrawable(getContext(), res).mutate();
+                    glyphColor = 0;
                 }
-                glyph.setColorFilter(new PorterDuffColorFilter(skinSlipMaterials().textSecondary, PorterDuff.Mode.SRC_IN));
+                final int color = skinSlipMaterials().textSecondary;
+                if (glyphColor != color) {
+                    glyphColor = color;
+                    glyph.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
+                }
                 final int size = dp(22);
                 final int left = (getWidth() - size) / 2;
                 final int top = (getHeight() - size) / 2;
                 glyph.setBounds(left, top, left + size, top + size);
+                if (rollingOut == null) {
+                    glyph.setAlpha(255);
+                    glyph.draw(canvas);
+                    return;
+                }
+                final float t = Math.min(1f, (SystemClock.uptimeMillis() - rollStart) / (float) SkinMotion.ROLL_MS);
+                final float p = SkinMotion.ROLL.getInterpolator().getInterpolation(t);
+                final float travel = dp(12);
+                canvas.save();
+                canvas.clipRect(0, 0, getWidth(), getHeight());
+                canvas.translate(0, -travel * p);
+                rollingOut.setBounds(left, top, left + size, top + size);
+                rollingOut.setAlpha((int) (255 * (1f - p)));
+                rollingOut.draw(canvas);
+                canvas.translate(0, travel);
+                glyph.setAlpha((int) (255 * p));
                 glyph.draw(canvas);
+                canvas.restore();
+                if (t < 1f) {
+                    invalidate();
+                } else {
+                    rollingOut = null;
+                }
             }
         };
         searchExpandList.setAnimationProperties(0, 0, 420, CubicBezierInterpolator.EASE_OUT_QUINT);
@@ -10766,12 +10797,24 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         final boolean results = !getMediaDataController().searchResultMessages.isEmpty() && searching && !searchingFiltered || chatMode == MODE_SEARCH && searchType == SEARCH_PUBLIC_POSTS && !messages.isEmpty();
-        final boolean up = results && skinSearchUpEnabled;
-        final boolean down = results && skinSearchDownEnabled;
-        skinSearchUp.setEnabled(up);
-        skinSearchUp.setAlpha(up ? 1f : 0.35f);
-        skinSearchDown.setEnabled(down);
-        skinSearchDown.setAlpha(down ? 1f : 0.35f);
+        setSkinSearchKeyEnabled(skinSearchUp, results && skinSearchUpEnabled);
+        setSkinSearchKeyEnabled(skinSearchDown, results && skinSearchDownEnabled);
+    }
+
+    /** A key dims as it goes inert and comes back as it wakes, carrying on from where it is. */
+    private void setSkinSearchKeyEnabled(ImageView key, boolean enabled) {
+        // Keys are created enabled and opaque, so an unchanged state needs nothing.
+        if (key.isEnabled() == enabled) {
+            return;
+        }
+        key.setEnabled(enabled);
+        final float alpha = enabled ? 1f : 0.35f;
+        key.animate().cancel();
+        if (!key.isShown() || SkinMotion.reduced()) {
+            key.setAlpha(alpha);
+            return;
+        }
+        key.animate().alpha(alpha).setDuration(SkinMotion.STATE_MS).setInterpolator(SkinMotion.STATE.getInterpolator()).start();
     }
 
     /** The search console in the skin's inks; "show other messages" covers the bar, so it gets the metal itself. */
