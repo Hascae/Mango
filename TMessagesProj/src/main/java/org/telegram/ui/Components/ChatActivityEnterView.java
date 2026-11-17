@@ -3598,6 +3598,10 @@ public class ChatActivityEnterView extends FrameLayout implements
             sendMessage();
         });
         sendButton.setOnLongClickListener(this::onSendLongClick);
+        if (skinFrame) {
+            // Once a long press has laid out the knob's keys, the same touch can slide on to one of them.
+            sendButton.setOnTouchListener(this::followSendKeys);
+        }
 //        ScaleStateListAnimator.apply(sendButton);
 
         slowModeButton = new SlowModeBtn(context);
@@ -4953,7 +4957,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 }
                 sendPopupLayout.setupRadialSelectors(getThemedColor(Theme.key_dialogButtonSelector));
                 if (skinFrame) {
-                    skinPopupKeys(sendPopupLayout, skinMaterials());
+                    skinSendKeys = skinPopupKeys(sendPopupLayout, skinMaterials());
                 }
 
                 sendPopupWindow = new ActionBarPopupWindow(sendPopupLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT) {
@@ -7502,8 +7506,37 @@ public class ChatActivityEnterView extends FrameLayout implements
         final CanvasMaterials m = skinMaterials();
         preview.setFog(Theme.multAlpha(m.page, 0.9f));
         if (options.getLayout() instanceof ActionBarPopupWindow.ActionBarPopupWindowLayout) {
-            skinPopupKeys((ActionBarPopupWindow.ActionBarPopupWindowLayout) options.getLayout(), m);
+            skinSendKeys = skinPopupKeys((ActionBarPopupWindow.ActionBarPopupWindowLayout) options.getLayout(), m);
         }
+    }
+
+    private SkinKeys.Inlay skinSendKeys;
+
+    /** Carries the long press on into the knob's keys: the porcelain follows the finger, and lifting it on a key presses that key. */
+    private boolean followSendKeys(View knob, MotionEvent event) {
+        final boolean open = messageSendPreview != null && messageSendPreview.isShowing() || sendPopupWindow != null && sendPopupWindow.isShowing();
+        if (skinSendKeys == null || !open) {
+            return false;
+        }
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_MOVE:
+                skinSendKeys.drag(event.getRawX(), event.getRawY());
+                return false;
+            case MotionEvent.ACTION_UP:
+                if (!skinSendKeys.release(event.getRawX(), event.getRawY())) {
+                    return false;
+                }
+                // The key has acted; the knob must not also take this release as its own tap.
+                final MotionEvent cancel = MotionEvent.obtain(event);
+                cancel.setAction(MotionEvent.ACTION_CANCEL);
+                knob.onTouchEvent(cancel);
+                cancel.recycle();
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                skinSendKeys.cancel();
+                return false;
+        }
+        return false;
     }
 
     private static final String SKIN_GROOVE = "skin_groove";
@@ -7533,18 +7566,24 @@ public class ChatActivityEnterView extends FrameLayout implements
         item.addView(text, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 30, 0));
     }
 
-    private void skinPopupKeys(ActionBarPopupWindow.ActionBarPopupWindowLayout layout, CanvasMaterials m) {
+    private SkinKeys.Inlay skinPopupKeys(ActionBarPopupWindow.ActionBarPopupWindowLayout layout, CanvasMaterials m) {
         layout.setBackgroundDrawable(SkinKeys.slab(m));
+        final SkinKeys.Inlay inlay = new SkinKeys.Inlay(m);
         for (int i = 0; i < layout.getItemsCount(); i++) {
             final View item = layout.getItemAt(i);
-            if (item == null || item instanceof ActionBarPopupWindow.GapView || SKIN_GROOVE.equals(item.getTag())) {
+            if (item == null || item instanceof ActionBarPopupWindow.GapView) {
+                continue;
+            }
+            if (SKIN_GROOVE.equals(item.getTag())) {
+                item.setBackground(inlay.background(item, false));
                 continue;
             }
             if (item instanceof ActionBarMenuSubItem) {
                 ((ActionBarMenuSubItem) item).setColors(m.text, m.text);
             }
-            item.setBackground(SkinKeys.key(m));
+            item.setBackground(inlay.background(item, true));
         }
+        return inlay;
     }
 
     private CanvasMaterials skinMaterials() {

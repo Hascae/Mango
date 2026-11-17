@@ -13,21 +13,26 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RippleDrawable;
-import android.graphics.drawable.StateListDrawable;
+import android.os.SystemClock;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.telegram.skin.motion.SkinHaptics;
+import org.telegram.skin.motion.SkinMotion;
 import org.telegram.skin.theme.CanvasMaterials;
 import org.telegram.ui.ActionBar.Theme;
+
+import java.util.ArrayList;
 
 /**
  * A Telegram menu restyled as a slab of the skin's keys: the aluminium slab
  * it sits on, and the celadon porcelain set into the key under the finger,
- * its LED lit. The menu keeps its own rows, touch and keyboard handling.
+ * its LED lit. The menu keeps its own rows, touch and keyboard handling;
+ * {@link Inlay} only adds a drag that began outside it.
  */
 public final class SkinKeys {
 
@@ -44,14 +49,175 @@ public final class SkinKeys {
         return new Slab(m);
     }
 
-    /** A row's background: nothing at rest, the porcelain inlay while pressed or selected. */
-    public static Drawable key(CanvasMaterials m) {
-        final StateListDrawable keys = new StateListDrawable();
-        final Drawable inlay = new Inlay(m);
-        keys.addState(new int[]{android.R.attr.state_pressed}, inlay);
-        keys.addState(new int[]{android.R.attr.state_selected}, inlay);
-        keys.addState(new int[0], new ColorDrawable(Color.TRANSPARENT));
-        return keys;
+    /**
+     * The porcelain inlay of a slab's keys, as one piece. It seats itself under
+     * the key that is pressed or selected, slides from key to key as the finger
+     * or the keyboard moves on, and fades where it is when none is chosen. Each
+     * row draws the part of it lying over that row, so it also passes behind a
+     * groove between groups. A drag that began outside the slab (the long press
+     * that opened it) is followed with {@link #drag} and ended with
+     * {@link #release} or {@link #cancel}.
+     */
+    public static final class Inlay {
+        private final CanvasMaterials m;
+        private final ArrayList<View> rows = new ArrayList<>();
+        private final ArrayList<View> keys = new ArrayList<>();
+        private final RectF rect = new RectF();
+        private final int[] location = new int[2];
+        private View target;
+        // Top and bottom in the rows' parent, seating by spring from wherever the inlay was.
+        private float fromTop, fromBottom, toTop, toBottom;
+        private long moveStart;
+        private boolean moving;
+        // Glazes in when a key is chosen, fades out when none is; either from its current strength.
+        private boolean shown;
+        private float fromPresence;
+        private long presenceStart;
+        private long invalidatedAt;
+
+        public Inlay(CanvasMaterials m) {
+            this.m = m;
+        }
+
+        /** The background for [row]: a [key] can take the inlay, any other row (a groove) only shows it passing. */
+        public Drawable background(View row, boolean key) {
+            rows.add(row);
+            if (key) {
+                keys.add(row);
+            }
+            return new Row(this, row, key);
+        }
+
+        /** Follows a finger at raw screen [x], [y]; the key under it takes the inlay with a tick. */
+        public void drag(float x, float y) {
+            final View key = keyAt(x, y);
+            if (key != null && key != target) {
+                SkinHaptics.tap(key);
+            }
+            setTarget(key);
+        }
+
+        /** Ends the drag at raw screen [x], [y]: the key under the finger acts. Returns whether one did. */
+        public boolean release(float x, float y) {
+            final View key = keyAt(x, y);
+            setTarget(null);
+            if (key == null) {
+                return false;
+            }
+            key.performClick();
+            return true;
+        }
+
+        public void cancel() {
+            setTarget(null);
+        }
+
+        private View keyAt(float x, float y) {
+            for (int i = 0; i < keys.size(); i++) {
+                final View key = keys.get(i);
+                if (key.getVisibility() != View.VISIBLE || !key.isEnabled() || !key.isAttachedToWindow()) {
+                    continue;
+                }
+                key.getLocationOnScreen(location);
+                if (x >= location[0] && x < location[0] + key.getWidth() && y >= location[1] && y < location[1] + key.getHeight()) {
+                    return key;
+                }
+            }
+            return null;
+        }
+
+        private void choose(View row, boolean chosen) {
+            if (chosen) {
+                setTarget(row);
+            } else if (target == row) {
+                setTarget(null);
+            }
+        }
+
+        private void setTarget(View row) {
+            if (row == target) {
+                return;
+            }
+            final long now = SystemClock.uptimeMillis();
+            final boolean reduced = SkinMotion.reduced();
+            if (row != null) {
+                if (presence(now) <= 0f || reduced) {
+                    // Nothing showing: it appears in place rather than sliding in from an old key.
+                    fromTop = toTop = row.getTop();
+                    fromBottom = toBottom = row.getBottom();
+                    moving = false;
+                } else {
+                    fromTop = position(fromTop, toTop, now);
+                    fromBottom = position(fromBottom, toBottom, now);
+                    toTop = row.getTop();
+                    toBottom = row.getBottom();
+                    moveStart = now;
+                    moving = true;
+                }
+            }
+            final boolean show = row != null;
+            if (show != shown) {
+                fromPresence = presence(now);
+                shown = show;
+                presenceStart = reduced ? now - 1000 : now;
+            }
+            target = row;
+            invalidateRows(now);
+        }
+
+        private float position(float from, float to, long now) {
+            if (!moving) {
+                return to;
+            }
+            return from + (to - from) * SkinMotion.springAt(SkinMotion.SEAT, now - moveStart);
+        }
+
+        private float presence(long now) {
+            final float t = now - presenceStart;
+            if (shown) {
+                final float f = Math.min(1f, t / SkinMotion.GLAZE_MS);
+                return fromPresence + (1f - fromPresence) * SkinMotion.GLAZE.getInterpolator().getInterpolation(f);
+            }
+            final float f = Math.min(1f, t / SkinMotion.EXIT_MS);
+            return fromPresence * (1f - SkinMotion.EXIT.getInterpolator().getInterpolation(f));
+        }
+
+        private boolean isMoving(long now) {
+            if (moving && now - moveStart >= SkinMotion.SEAT.getSettleMs()) {
+                moving = false;
+            }
+            return moving || now - presenceStart < (shown ? SkinMotion.GLAZE_MS : SkinMotion.EXIT_MS);
+        }
+
+        private void invalidateRows(long now) {
+            if (invalidatedAt == now) {
+                return;
+            }
+            invalidatedAt = now;
+            for (int i = 0; i < rows.size(); i++) {
+                rows.get(i).invalidate();
+            }
+        }
+
+        private void draw(View row, Canvas canvas, Rect bounds, int alpha) {
+            final long now = SystemClock.uptimeMillis();
+            final float a = presence(now) * alpha / 255f;
+            if (a > 0f) {
+                final float top = position(fromTop, toTop, now) - row.getTop();
+                final float bottom = position(fromBottom, toBottom, now) - row.getTop();
+                // Drawn from a fixed origin, so the glaze's gradient is not rebuilt as it slides.
+                canvas.save();
+                canvas.translate(bounds.left, top);
+                rect.set(0, 0, bounds.width(), bottom - top);
+                SkinMetal.drawPorcelain(canvas, rect, Math.min(dpf2(INLAY_RADIUS), rect.height() / 2f), m, true, a);
+                final float led = dpf2(3);
+                SkinStyle.drawLed(canvas, rect.right - dpf2(12) - led, rect.centerY(), led, true, m.led, m.textTertiary, a);
+                canvas.restore();
+            }
+            if (isMoving(now)) {
+                invalidateRows(now);
+            }
+        }
     }
 
     /** A search field's ground: a well sunk into the metal, corner radius [radiusDp]. */
@@ -195,24 +361,42 @@ public final class SkinKeys {
         }
     }
 
-    private static final class Inlay extends Base {
-        private final RectF rect = new RectF();
+    /** A row's share of the {@link Inlay}; a key row also tells it when it is pressed or selected. */
+    private static final class Row extends Base {
+        private final Inlay inlay;
+        private final View row;
+        private final boolean key;
 
-        Inlay(CanvasMaterials m) {
-            super(m);
+        Row(Inlay inlay, View row, boolean key) {
+            super(inlay.m);
+            this.inlay = inlay;
+            this.row = row;
+            this.key = key;
+        }
+
+        @Override
+        public boolean isStateful() {
+            return key;
+        }
+
+        @Override
+        protected boolean onStateChange(@NonNull int[] state) {
+            boolean chosen = false;
+            for (int s : state) {
+                if (s == android.R.attr.state_pressed || s == android.R.attr.state_selected) {
+                    chosen = true;
+                    break;
+                }
+            }
+            inlay.choose(row, chosen);
+            return false;
         }
 
         @Override
         public void draw(@NonNull Canvas canvas) {
-            final Rect b = getBounds();
-            if (b.isEmpty()) {
-                return;
+            if (!getBounds().isEmpty()) {
+                inlay.draw(row, canvas, getBounds(), alpha);
             }
-            final float a = alpha / 255f;
-            rect.set(b);
-            SkinMetal.drawPorcelain(canvas, rect, Math.min(dpf2(INLAY_RADIUS), rect.height() / 2f), m, true, a);
-            final float led = dpf2(3);
-            SkinStyle.drawLed(canvas, rect.right - dpf2(12) - led, rect.centerY(), led, true, m.led, m.textTertiary, a);
         }
     }
 }
