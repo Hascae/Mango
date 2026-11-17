@@ -25,6 +25,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RippleDrawable;
+import android.os.SystemClock;
 import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -35,6 +36,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.annotation.Keep;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.skin.motion.SkinMotion;
 import org.telegram.skin.theme.CanvasMaterials;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.SkinMetal;
@@ -383,7 +385,7 @@ public class Switch extends View {
         int ty = getMeasuredHeight() / 2;
 
         if (SkinSwitch.CONTROLS && overrideColorProgress == 0) {
-            drawSkin(canvas, x, width, tx, ty);
+            drawSkin(canvas, x, width, ty);
             return;
         }
 
@@ -547,19 +549,66 @@ public class Switch extends View {
 
     private final RectF skinTrack = new RectF();
 
+    // The skin keeps its own time for a change: the cap slides on the toggle spring with the
+    // metal's weight, while the glaze is injected into the groove, or drains from it, on its own
+    // curve. A change part way carries on from where both are.
+    private float skinTarget = -1f;
+    private float skinCapFrom, skinGlazeFrom;
+    private long skinSince;
+    private int skinIconColor;
+
+    private float skinCap(long now) {
+        if (skinSince == 0) {
+            return skinTarget;
+        }
+        return skinCapFrom + (skinTarget - skinCapFrom) * SkinMotion.springAt(SkinMotion.TOGGLE, now - skinSince);
+    }
+
+    private float skinGlaze(long now) {
+        if (skinSince == 0) {
+            return skinTarget;
+        }
+        final boolean filling = skinTarget > skinGlazeFrom;
+        final float f = Math.min(1f, (now - skinSince) / (float) (filling ? SkinMotion.GLAZE_MS : SkinMotion.EXIT_MS));
+        final float eased = (filling ? SkinMotion.GLAZE : SkinMotion.EXIT).getInterpolator().getInterpolation(f);
+        return skinGlazeFrom + (skinTarget - skinGlazeFrom) * eased;
+    }
+
     /** The skin's switch: a groove that fills with celadon glaze when on, a metal cap for the thumb, its icon in the metal's ink. */
-    private void drawSkin(Canvas canvas, int x, int width, int tx, int ty) {
+    private void drawSkin(Canvas canvas, int x, int width, int ty) {
+        final long now = SystemClock.uptimeMillis();
+        final float target = isChecked ? 1f : 0f;
+        if (target != skinTarget) {
+            // Only a change Telegram animates moves; one set without animation is there at once.
+            final boolean animate = skinTarget >= 0f && checkAnimator != null && !SkinMotion.reduced();
+            skinCapFrom = animate ? skinCap(now) : target;
+            skinGlazeFrom = animate ? skinGlaze(now) : target;
+            skinTarget = target;
+            skinSince = animate ? now : 0;
+        }
+        final float cap = skinCap(now);
+        final float glaze = skinGlaze(now);
+        if (skinSince != 0 && now - skinSince >= Math.max(SkinMotion.TOGGLE.getSettleMs(), SkinMotion.GLAZE_MS)) {
+            skinSince = 0;
+        }
+        final int tx = x + AndroidUtilities.dp(7) + (int) (AndroidUtilities.dp(17) * cap);
         final CanvasMaterials m = SkinMetal.materials(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider));
         skinTrack.set(x, ty - AndroidUtilities.dpf2(8), x + width, ty + AndroidUtilities.dpf2(8));
         if (rippleDrawable != null) {
             rippleDrawable.setBounds(tx - AndroidUtilities.dp(18), ty - AndroidUtilities.dp(18), tx + AndroidUtilities.dp(18), ty + AndroidUtilities.dp(18));
             rippleDrawable.draw(canvas);
         }
-        SkinMetal.drawToggle(canvas, skinTrack, tx, ty, AndroidUtilities.dpf2(9), progress, m, 1f);
+        SkinMetal.drawToggle(canvas, skinTrack, tx, ty, AndroidUtilities.dpf2(9), glaze, m, 1f);
+        if (skinSince != 0) {
+            invalidate();
+        }
 
         paint2.setColor(m.text);
         if (iconDrawable != null) {
-            iconDrawable.setColorFilter(new PorterDuffColorFilter(m.text, PorterDuff.Mode.MULTIPLY));
+            if (skinIconColor != m.text) {
+                skinIconColor = m.text;
+                iconDrawable.setColorFilter(new PorterDuffColorFilter(m.text, PorterDuff.Mode.MULTIPLY));
+            }
             iconDrawable.setBounds(tx - iconDrawable.getIntrinsicWidth() / 2, ty - iconDrawable.getIntrinsicHeight() / 2, tx + iconDrawable.getIntrinsicWidth() / 2, ty + iconDrawable.getIntrinsicHeight() / 2);
             iconDrawable.draw(canvas);
         } else if (drawIconType == 1) {
