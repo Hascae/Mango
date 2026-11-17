@@ -257,6 +257,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
     private boolean updateRecordViaSco;
     private boolean updateDistance;
     private boolean updateSearchEngine;
+    private boolean updateSkinBubbleStyle;
 
     private GpsLocationListener gpsLocationListener = new GpsLocationListener();
     private GpsLocationListener networkLocationListener = new GpsLocationListener();
@@ -1709,6 +1710,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                 showDialog(AlertsCreator.createSingleChoiceDialog(getParentActivity(), styles, getString(R.string.SkinBubbleStyle), Theme.getSkinBubbleStyle(), (dialog, which) -> {
                     if (which != Theme.getSkinBubbleStyle()) {
                         Theme.setSkinBubbleStyle(which);
+                        updateSkinBubbleStyle = true;
                         listAdapter.notifyItemChanged(skinBubbleStyleRow);
                     }
                 }));
@@ -2828,7 +2830,8 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                     } else if (position == skinBubbleStyleRow) {
                         final int style = Theme.getSkinBubbleStyle();
                         cell.setTextAndValue(getString(R.string.SkinBubbleStyle), getString(style == Theme.SKIN_BUBBLES_GRAPHITE ? R.string.SkinBubbleStyleGraphite
-                            : style == Theme.SKIN_BUBBLES_CELADON ? R.string.SkinBubbleStyleCeladon : R.string.SkinBubbleStyleFollow), false);
+                            : style == Theme.SKIN_BUBBLES_CELADON ? R.string.SkinBubbleStyleCeladon : R.string.SkinBubbleStyleFollow), updateSkinBubbleStyle, false);
+                        updateSkinBubbleStyle = false;
                     }
                     break;
                 }
