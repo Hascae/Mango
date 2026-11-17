@@ -70,8 +70,11 @@ public class ChatActivityEnterViewAnimatedIconView extends RLottieImageView {
             final Drawable previous = getDrawable();
             setImageResource(glyphs[state.ordinal()]);
             if (animate && previous != null && fromState != null && fromState != state && !SkinMotion.reduced()) {
-                flipFrom = previous;
-                flipStart = SystemClock.uptimeMillis();
+                // A change mid-flip only replaces the face coming up, so the cap never jumps back.
+                if (flipFrom == null || SystemClock.uptimeMillis() - flipStart >= SkinMotion.MORPH_MS) {
+                    flipFrom = previous;
+                    flipStart = SystemClock.uptimeMillis();
+                }
             } else {
                 flipFrom = null;
             }

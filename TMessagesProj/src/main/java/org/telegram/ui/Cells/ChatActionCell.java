@@ -563,8 +563,10 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         if (customText != null && TextUtils.equals(newText, customText)) {
             return;
         }
-        if (SkinSwitch.CHAT_FRAME && previousDate != 0 && textLayout != null && wasLayout && isShown() && !SkinMotion.reduced()) {
-            // The skin's floating date rolls to the next day as its other figures roll.
+        if (SkinSwitch.CHAT_FRAME && previousDate != 0 && textLayout != null && wasLayout && isShown() && !SkinMotion.reduced()
+                && (skinRollingOut == null || SystemClock.uptimeMillis() - skinRollStart >= SkinMotion.ROLL_MS)) {
+            // The skin's floating date rolls to the next day as its other figures roll. Another
+            // day arriving mid-roll only replaces the incoming text, so the roll never jumps.
             skinRollingOut = textLayout;
             skinRollingOutX = textXLeft;
             skinRollStart = SystemClock.uptimeMillis();

@@ -10606,9 +10606,12 @@ public class ChatActivity extends BaseFragment implements
                     res = org.telegram.skin.R.drawable.skin_search_list;
                 }
                 if (glyph == null || glyphRes != res) {
-                    // A new glyph rolls up into the key like the result count beside it.
-                    rollingOut = glyph != null && isLaidOut() && !SkinMotion.reduced() ? glyph : null;
-                    rollStart = SystemClock.uptimeMillis();
+                    // A new glyph rolls up into the key like the result count beside it. One arriving
+                    // mid-roll only replaces the incoming glyph, so the roll never jumps.
+                    if (rollingOut == null || SystemClock.uptimeMillis() - rollStart >= SkinMotion.ROLL_MS) {
+                        rollingOut = glyph != null && isLaidOut() && !SkinMotion.reduced() ? glyph : null;
+                        rollStart = SystemClock.uptimeMillis();
+                    }
                     glyphRes = res;
                     glyph = ContextCompat.getDrawable(getContext(), res).mutate();
                     glyphColor = 0;
