@@ -7545,6 +7545,14 @@ public class ChatActivityEnterView extends FrameLayout implements
     private View skinOptionsGroove() {
         final View groove = new View(getContext()) {
             @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                // As wide as the keys, not as wide as the room offered: a plain view would take it
+                // all and stretch the slab past the screen. The column gives it the keys' width.
+                final int width = MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY ? MeasureSpec.getSize(widthMeasureSpec) : 0;
+                setMeasuredDimension(width, MeasureSpec.getSize(heightMeasureSpec));
+            }
+
+            @Override
             protected void onDraw(Canvas canvas) {
                 SkinMetal.drawGrooveAcross(canvas, dp(12), getWidth() - dp(12), getHeight() / 2f - dp(1), skinMaterials(), 1f);
             }
@@ -7993,7 +8001,10 @@ public class ChatActivityEnterView extends FrameLayout implements
             left = AndroidUtilities.lerp(left, dp(46), keys);
             right = AndroidUtilities.lerp(right, container.getWidth() - skinRecordKeys.reserve() - dp(2), keys);
         }
-        final float top = dp(3);
+        // The field grows on Telegram's animated height, as the console around it does; the
+        // container itself is already at its new height, so the well must not follow that.
+        final float field = Math.max(dp(44), animatorInputFieldHeight.getFactor());
+        final float top = container.getHeight() - field + dp(3);
         final float bottom = container.getHeight() - dp(3);
         skinWellRect.set(left, top, right, bottom);
         SkinMetal.drawWell(canvas, skinWellRect, Math.min(dp(19), skinWellRect.height() / 2f), skinMaterials(), 1f);
@@ -15562,6 +15573,9 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (id == ANIMATOR_ID_INPUT_FIELD_HEIGHT) {
             checkUi_IslandTotalHeight();
             checkUi_TopViewVisibility();
+            if (skinFrame && messageEditTextContainer != null) {
+                messageEditTextContainer.invalidate();
+            }
         }
         if (id == ANIMATOR_ID_TOP_VIEW_VISIBILITY) {
             checkUi_IslandTotalHeight();
