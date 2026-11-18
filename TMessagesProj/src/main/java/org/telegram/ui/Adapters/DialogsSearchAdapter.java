@@ -51,6 +51,7 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Cells.DialogCell;
 import org.telegram.ui.Cells.GraySectionCell;
 import org.telegram.ui.Cells.HashtagSearchCell;
@@ -890,6 +891,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         recentSearchObject.date = (int) (System.currentTimeMillis() / 1000);
         filterRecent(lastSearchText != null ? lastSearchText.trim() : null);
         notifyDataSetChanged();
+        putRecentSearch(currentAccount, did);
+    }
+
+    public static void putRecentSearch(int currentAccount, long did) {
         MessagesStorage.getInstance(currentAccount).getStorageQueue().postRunnable(() -> {
             try {
                 SQLitePreparedStatement state = MessagesStorage.getInstance(currentAccount).getDatabase().executeFast("REPLACE INTO search_recent VALUES(?, ?)");
@@ -898,6 +903,16 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 state.bindInteger(2, (int) (System.currentTimeMillis() / 1000));
                 state.step();
                 state.dispose();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        });
+    }
+
+    public static void clearRecentSearch(int currentAccount) {
+        MessagesStorage.getInstance(currentAccount).getStorageQueue().postRunnable(() -> {
+            try {
+                MessagesStorage.getInstance(currentAccount).getDatabase().executeFast("DELETE FROM search_recent WHERE 1").stepThis().dispose();
             } catch (Exception e) {
                 FileLog.e(e);
             }
@@ -938,6 +953,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         final StringBuilder finalQueryFilter = queryFilter;
         filterRecent(lastSearchText != null ? lastSearchText.trim() : null);
         notifyDataSetChanged();
+        if (!searchWas) {
+            clearRecentSearch(currentAccount);
+            return;
+        }
         MessagesStorage.getInstance(currentAccount).getStorageQueue().postRunnable(() -> {
             try {
                 finalQueryFilter.insert(0, "DELETE FROM search_recent WHERE ");
@@ -1007,21 +1026,6 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             ArrayList<ContactsController.Contact> contacts = new ArrayList<>();
 
             MessagesStorage.getInstance(currentAccount).localSearch(dialogsType, q, resultArray, resultArrayNames, encUsers, filterDialogIds, -1);
-//            if (allContacts == null) {
-//                allContacts = new ArrayList<>();
-//                for (ContactsController.Contact contact : ContactsController.getInstance(currentAccount).phoneBookContacts) {
-//                    ContactEntry contactEntry = new ContactEntry();
-//                    contactEntry.contact = contact;
-//                    contactEntry.q1 = (contact.first_name + " " + contact.last_name).toLowerCase();
-//                    contactEntry.q2 = (contact.last_name + " " + contact.first_name).toLowerCase();
-//                    allContacts.add(contactEntry);
-//                }
-//            }
-//            for (int i = 0; i < allContacts.size(); i++) {
-//                if (allContacts.get(i).q1.toLowerCase().contains(q) || allContacts.get(i).q1.toLowerCase().contains(q)) {
-//                    contacts.add(allContacts.get(i).contact);
-//                }
-//            }
             updateSearchResults(resultArray, resultArrayNames, encUsers, contacts, searchId);
             FiltersView.fillTipDates(q, localTipDates);
             localTipArchive = false;
@@ -1411,10 +1415,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         count += resultsCount;
         int localServerCount = searchAdapterHelper.getLocalServerSearch().size();
         count += localServerCount;
-        int globalCount = searchAdapterHelper.getGlobalSearch().size() + sponsoredPeers.size();
-        if (globalCount > 3 && globalSearchCollapsed) {
-            globalCount = 3;
+        int globalSearchCount = searchAdapterHelper.getGlobalSearch().size();
+        if (globalSearchCount > 3 && globalSearchCollapsed) {
+            globalSearchCount = 3;
         }
+        int globalCount = globalSearchCount + sponsoredPeers.size();
         int phoneCount = searchAdapterHelper.getPhoneSearch().size();
         if (phoneCount > 3 && phoneCollapsed) {
             phoneCount = 3;
@@ -1515,10 +1520,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         if (phoneCount > 3 && phoneCollapsed) {
             phoneCount = 3;
         }
-        int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearch.size() + sponsoredPeers.size() + 1;
-        if (globalCount > 4 && globalSearchCollapsed) {
-            globalCount = 4;
+        int globalSearchCount = globalSearch.size();
+        if (globalSearchCount > 3 && globalSearchCollapsed) {
+            globalSearchCount = 3;
         }
+        int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearchCount + sponsoredPeers.size() + 1;
         if (i >= 0 && i < localCount) {
             return searchResult.get(i);
         }
@@ -1583,10 +1589,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         if (phoneCount > 3 && phoneCollapsed) {
             phoneCount = 3;
         }
-        int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearch.size() + sponsoredPeers.size() + 1;
-        if (globalCount > 4 && globalSearchCollapsed) {
-            globalCount = 4;
+        int globalSearchCount = globalSearch.size();
+        if (globalSearchCount > 3 && globalSearchCollapsed) {
+            globalSearchCount = 3;
         }
+        int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearchCount + sponsoredPeers.size() + 1;
         int contactsCount = searchContacts.size();
         if (contactsCount > 0) {
             if (i >= 0 && i < contactsCount) {
@@ -1685,7 +1692,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                         return super.onInterceptTouchEvent(e);
                     }
                 };
-                horizontalListView.setSelectorDrawableColor(Theme.getColor(Theme.key_listSelector));
+                ThemeBind.listSelectorColor(horizontalListView, Theme.key_listSelector);
                 horizontalListView.setTag(9);
                 horizontalListView.setItemAnimator(null);
                 horizontalListView.setLayoutAnimation(null);
@@ -1757,7 +1764,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         switch (holder.getItemViewType()) {
             case VIEW_TYPE_PROFILE_CELL: {
                 ProfileSearchCell cell = (ProfileSearchCell) holder.itemView;
-                cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                ThemeBind.backgroundColor(cell, Theme.key_windowBackgroundWhite);
                 long oldDialogId = cell.getDialogId();
 
                 TLRPC.User user = null;
@@ -1833,10 +1840,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 if (phoneCount > 0 && phoneSearch.get(phoneCount - 1) instanceof String) {
                     phoneCount2 -= 2;
                 }
-                int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearch.size() + sponsoredPeers.size() + 1;
-                if (globalCount > 4 && globalSearchCollapsed) {
-                    globalCount = 4;
+                int globalSearchCount = globalSearch.size();
+                if (globalSearchCount > 3 && globalSearchCollapsed) {
+                    globalSearchCount = 3;
                 }
+                int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearchCount + sponsoredPeers.size() + 1;
                 if (!isRecent) {
                     cell.useSeparator = (
                         position != getItemCount() - getRecentItemsCount() - 1 &&
@@ -2019,10 +2027,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                     if (phoneCount > 3 && phoneCollapsed) {
                         phoneCount = 3;
                     }
-                    int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearch.size() + sponsoredPeers.size() + 1;
-                    if (globalCount > 4 && globalSearchCollapsed) {
-                        globalCount = 4;
+                    int globalSearchCount = globalSearch.size();
+                    if (globalSearchCount > 3 && globalSearchCollapsed) {
+                        globalSearchCount = 3;
                     }
+                    int globalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearchCount + sponsoredPeers.size() + 1;
                     int localMessagesCount = searchForumResultMessages.isEmpty() ? 0 : searchForumResultMessages.size() + 1;
                     int messagesCount = searchResultMessages.isEmpty() ? 0 : searchResultMessages.size() + 1;
                     if ((currentMessagesFilter != Filter.All || forceLoadingMessages) && searchResultMessages.isEmpty()) {
@@ -2060,7 +2069,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             position -= phoneCount;
                             if (position >= 0 && position < globalCount) {
                                 title = LocaleController.getString(R.string.GlobalSearch);
-                                if (searchAdapterHelper.getGlobalSearch().size() + sponsoredPeers.size() > 3) {
+                                if (searchAdapterHelper.getGlobalSearch().size() > 3) {
                                     showMore = globalSearchCollapsed;
                                     onClick = () -> {
                                         final long now = SystemClock.elapsedRealtime();
@@ -2069,8 +2078,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                                         }
                                         lastShowMoreUpdate = now;
 
-                                        int totalGlobalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearch.size() + sponsoredPeers.size();
-                                        boolean disableRemoveAnimation = getItemCount() > rawPosition + Math.min(totalGlobalCount, globalSearchCollapsed ? 4 : Integer.MAX_VALUE) + 1;
+                                        final int sponsoredCountAtClick = sponsoredPeers.size();
+                                        final int globalSearchCountAtClick = globalSearch.size();
+                                        int totalGlobalCount = globalSearch.isEmpty() && sponsoredPeers.isEmpty() ? 0 : globalSearchCountAtClick + sponsoredCountAtClick;
+                                        int collapsedVisibleCount = sponsoredCountAtClick + Math.min(3, globalSearchCountAtClick);
+                                        boolean disableRemoveAnimation = getItemCount() > rawPosition + (globalSearchCollapsed ? collapsedVisibleCount : totalGlobalCount) + 1;
                                         if (itemAnimator != null) {
                                             itemAnimator.setAddDuration(disableRemoveAnimation ? 45 : 200);
                                             itemAnimator.setRemoveDuration(disableRemoveAnimation ? 80 : 200);
@@ -2083,7 +2095,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                                         View parent = (View) cell.getParent();
                                         if (parent instanceof RecyclerView) {
                                             RecyclerView listView = (RecyclerView) parent;
-                                            final int nextGraySectionPosition = !globalSearchCollapsed ? rawPosition + 4 : rawPosition + totalGlobalCount + 1;
+                                            final int nextGraySectionPosition = !globalSearchCollapsed ? rawPosition + collapsedVisibleCount + 1 : rawPosition + totalGlobalCount + 1;
                                             for (int i = 0; i < listView.getChildCount(); ++i) {
                                                 View child = listView.getChildAt(i);
                                                 if (listView.getChildAdapterPosition(child) == nextGraySectionPosition) {
@@ -2092,15 +2104,18 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                                                 }
                                             }
                                         }
+                                        final int lastCollapsedItemPosition = rawPosition + collapsedVisibleCount;
+                                        final int hiddenStartPosition = rawPosition + collapsedVisibleCount + 1;
+                                        final int hiddenCount = Math.max(0, globalSearchCountAtClick - 3);
                                         if (!globalSearchCollapsed) {
-                                            notifyItemChanged(rawPosition + 3);
-                                            notifyItemRangeInserted(rawPosition + 4, (totalGlobalCount - 3));
+                                            notifyItemChanged(lastCollapsedItemPosition);
+                                            notifyItemRangeInserted(hiddenStartPosition, hiddenCount);
                                         } else {
-                                            notifyItemRangeRemoved(rawPosition + 4, (totalGlobalCount - 3));
+                                            notifyItemRangeRemoved(hiddenStartPosition, hiddenCount);
                                             if (disableRemoveAnimation) {
-                                                AndroidUtilities.runOnUIThread(() -> notifyItemChanged(rawPosition + 3), 350);
+                                                AndroidUtilities.runOnUIThread(() -> notifyItemChanged(lastCollapsedItemPosition), 350);
                                             } else {
-                                                notifyItemChanged(rawPosition + 3);
+                                                notifyItemChanged(lastCollapsedItemPosition);
                                             }
                                         }
 
@@ -2170,7 +2185,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             case VIEW_TYPE_DIALOG_CELL:
             case VIEW_TYPE_PUBLIC_POST: {
                 DialogCell cell = (DialogCell) holder.itemView;
-                cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                ThemeBind.backgroundColor(cell, Theme.key_windowBackgroundWhite);
                 cell.useSeparator = (position != getItemCount() - 1);
                 MessageObject messageObject = (MessageObject) getItem(position);
                 boolean isLocalForum = searchForumResultMessages.contains(messageObject);
@@ -2189,7 +2204,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             }
             case VIEW_TYPE_HASHTAG_CELL: {
                 HashtagSearchCell cell = (HashtagSearchCell) holder.itemView;
-                cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                ThemeBind.backgroundColor(cell, Theme.key_windowBackgroundWhite);
                 cell.setText(searchResultHashtags.get(position - 1));
                 cell.setNeedDivider(position != searchResultHashtags.size());
                 break;
@@ -2283,10 +2298,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         if (phoneCount > 3 && phoneCollapsed) {
             phoneCount = 3;
         }
-        int globalCount = sponsoredPeers.isEmpty() && globalSearch.isEmpty() ? 0 : globalSearch.size() + sponsoredPeers.size() + 1;
-        if (globalCount > 4 && globalSearchCollapsed) {
-            globalCount = 4;
+        int globalSearchCount = globalSearch.size();
+        if (globalSearchCount > 3 && globalSearchCollapsed) {
+            globalSearchCount = 3;
         }
+        int globalCount = sponsoredPeers.isEmpty() && globalSearch.isEmpty() ? 0 : globalSearchCount + sponsoredPeers.size() + 1;
         int messagesCount = searchResultMessages.isEmpty() ? 0 : searchResultMessages.size() + 1;
         if ((currentMessagesFilter != Filter.All || forceLoadingMessages) && searchResultMessages.isEmpty()) {
             messagesCount = forceLoadingMessages ? 4 : 2;
@@ -2466,12 +2482,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             setOrientation(LinearLayout.VERTICAL);
 
             BackupImageView imageView = new BackupImageView(context);
-            imageView.setImageDrawable(new RLottieDrawable(R.raw.utyan_empty, "utyan_empty", dp(120), dp(120)));
+            imageView.setImageDrawable(new RLottieDrawable(R.raw.utyan_empty, dp(120), dp(120)));
             addView(imageView, LayoutHelper.createLinear(120, 120, Gravity.CENTER_HORIZONTAL, 0, 27, 0, 0));
 
             TextView titleView = new TextView(context);
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
-            titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
+            ThemeBind.textColor(titleView, Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
             titleView.setTypeface(AndroidUtilities.bold());
             titleView.setText(LocaleController.getString(R.string.SearchMessagesFilterEmptyTitle));
             titleView.setGravity(Gravity.CENTER);
@@ -2479,7 +2495,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
 
             textView = new TextView(context);
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
+            ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
             textView.setText(LocaleController.formatString(R.string.SearchMessagesFilterEmptyText, ""));
             textView.setGravity(Gravity.CENTER);
             addView(textView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 0, 0, 14));
@@ -2488,8 +2504,8 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             button.setPadding(dp(12), dp(4), dp(12), dp(4));
             button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             button.setText(LocaleController.getString(R.string.SearchMessagesFilterEmptySearchAll));
-            button.setTextColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
-            button.setBackground(Theme.createSimpleSelectorRoundRectDrawable(6, 0, Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider), .15f)));
+            ThemeBind.textColor(button, Theme.key_featuredStickers_addButton, resourcesProvider);
+            ThemeBind.selectorBackground(button, Theme.createSimpleSelectorRoundRectDrawable(6, 0, Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider), .15f)), null, ThemeBind.multAlpha(Theme.key_featuredStickers_addButton, .15f), resourcesProvider);
             button.setOnClickListener(v -> onClickAll.run());
             addView(button, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 0, 0, 38));
         }
@@ -2546,29 +2562,13 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         int globalSearchPosition = globalSearchPosition();
         if (globalSearchPosition >= getItemCount()) return;
 
-        int wasGlobalCountUncollapsed = searchAdapterHelper.getGlobalSearch().size() + sponsoredPeers.size();
-        int wasGlobalCount = wasGlobalCountUncollapsed;
-        if (wasGlobalCount > 3 && globalSearchCollapsed) {
-            wasGlobalCount = 3;
-        }
-
         sponsoredPeers.remove(index);
         notifyItemRemoved(globalSearchPosition + 1 + index);
 
-        int globalCountUncollapsed = searchAdapterHelper.getGlobalSearch().size() + sponsoredPeers.size();
-        int globalCount = globalCountUncollapsed;
-        if (globalCount > 3 && globalSearchCollapsed) {
-            globalCount = 3;
-        }
-
-        if (globalCount > 0 && (wasGlobalCountUncollapsed > 3) != (globalCountUncollapsed > 3)) {
-            notifyItemChanged(globalSearchPosition);
-        }
-
-        if (globalCount <= 0) {
+        int globalSearchSize = searchAdapterHelper.getGlobalSearch().size();
+        int visibleAfter = sponsoredPeers.size() + (globalSearchCollapsed ? Math.min(3, globalSearchSize) : globalSearchSize);
+        if (visibleAfter <= 0) {
             notifyItemRemoved(globalSearchPosition);
-        } else if (globalSearchCollapsed) {
-            notifyItemChanged(globalSearchPosition + 2);notifyItemRangeInserted(globalSearchPosition + 1 + (3 - 1), Math.min(Math.max(0, wasGlobalCountUncollapsed - 3), 1));
         }
     }
 
@@ -2578,34 +2578,14 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         int globalSearchPosition = globalSearchPosition();
         if (globalSearchPosition >= getItemCount()) return;
 
-        int wasGlobalCountUncollapsed = searchAdapterHelper.getGlobalSearch().size() + sponsoredPeers.size();
-        int wasGlobalCount = wasGlobalCountUncollapsed;
-        if (wasGlobalCount > 3 && globalSearchCollapsed) {
-            wasGlobalCount = 3;
-        }
-
         int sponsoredCount = sponsoredPeers.size();
-        if (globalSearchCollapsed) {
-            sponsoredCount = Math.min(3, sponsoredCount);
-        }
         sponsoredPeers.clear();
         notifyItemRangeRemoved(globalSearchPosition + 1, sponsoredCount);
 
-        int globalCountUncollapsed = searchAdapterHelper.getGlobalSearch().size() + sponsoredPeers.size();
-        int globalCount = globalCountUncollapsed;
-        if (globalCount > 3 && globalSearchCollapsed) {
-            globalCount = 3;
-        }
-
-        if (globalCount > 0 && (wasGlobalCountUncollapsed > 3) != (globalCountUncollapsed > 3)) {
-            notifyItemChanged(globalSearchPosition);
-        }
-
-        if (globalCount <= 0) {
+        int globalSearchSize = searchAdapterHelper.getGlobalSearch().size();
+        int visibleAfter = globalSearchCollapsed ? Math.min(3, globalSearchSize) : globalSearchSize;
+        if (visibleAfter <= 0) {
             notifyItemRemoved(globalSearchPosition);
-        } else if (globalSearchCollapsed) {
-            notifyItemChanged(globalSearchPosition + (3 - sponsoredCount));
-            notifyItemRangeInserted(globalSearchPosition + 1 + (3 - sponsoredCount), Math.min(Math.max(0, wasGlobalCountUncollapsed - 3), sponsoredCount));
         }
     }
 

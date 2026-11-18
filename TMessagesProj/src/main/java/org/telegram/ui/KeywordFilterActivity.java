@@ -351,11 +351,6 @@ public class KeywordFilterActivity extends BaseFragment {
                 }
                 return filteredDialogs;
             }
-
-            @Override
-            public boolean shouldShowNextButton(DialogsActivity fragment, ArrayList<Long> dids, CharSequence message, boolean param) {
-                return dids != null && !dids.isEmpty();
-            }
         };
         fragment.setCurrentAccount(currentAccount);
         fragment.setDelegate((dialogsActivity, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {

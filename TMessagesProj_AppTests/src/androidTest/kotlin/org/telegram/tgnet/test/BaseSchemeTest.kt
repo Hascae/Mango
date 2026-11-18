@@ -102,18 +102,73 @@ open class BaseSchemeTest {
         }
     }
 
-    class SafeRecursionStrategy(private val fixture: Fixture) : RecursionStrategy {
+    /**
+     * Recursion strategy that tracks how many times each type appears in the
+     * current construction stack and cuts off when it exceeds [maxOccurrences].
+     *
+     * This allows real nested objects to be generated (keeping tests meaningful)
+     * while preventing infinite recursion caused by mutually-recursive TL types.
+     *
+     * Example with maxOccurrences = 1:
+     *   A → B → C      — no repetition, full object graph is built
+     *   A → B → A      — second visit to A hits the limit, returns a minimal instance
+     */
+    class SafeRecursionStrategy(
+        private val fixture: Fixture,
+        /**
+         * How many times a single type may appear in the construction stack
+         * before recursion is cut off.
+         *
+         * Raise to 2 if the schema legitimately nests the same type twice
+         * (e.g. a tree node that owns a list of tree nodes).
+         */
+        private val maxOccurrences: Int = 1
+    ) : RecursionStrategy {
+
+        /**
+         * Per-thread stack of types currently being constructed.
+         * ThreadLocal makes this safe for parallel test execution.
+         */
+        private val typeStack = ThreadLocal.withInitial { mutableListOf<KType>() }
+
         override fun handleRecursion(type: KType, stack: Collection<KType>): Any? {
-            if (type.isMarkedNullable) {
-                return null
+            if (type.isMarkedNullable) return null
+
+            val currentStack = typeStack.get()
+            val occurrences = currentStack.count { it == type }
+
+            if (occurrences >= maxOccurrences) {
+                // Limit reached — return the most minimal valid instance so that
+                // non-nullable fields are still satisfied without going deeper.
+                return createMinimalInstance(type)
             }
 
-            val configuration = ConfigurationBuilder(fixture.fixtureConfiguration).let {
-                it.recursionStrategy(this)
-                it.nullabilityStrategy(AlwaysNullStrategy)
-                it.repeatCount { 0 }
-                it.build()
+            currentStack.add(type)
+            return try {
+                val strategies = fixture.fixtureConfiguration.strategies.toMutableMap()
+                strategies[RecursionStrategy::class] = this
+                strategies[NullabilityStrategy::class] = AlwaysNullStrategy
+
+                @Suppress("DEPRECATION_ERROR")
+                fixture.create(type, fixture.fixtureConfiguration.copy(
+                    strategies = strategies,
+                    repeatCount = { 0 },
+                ))
+            } finally {
+                // Always pop, even if fixture.create throws.
+                currentStack.removeLast()
             }
+        }
+
+        /**
+         * Produces a structurally valid but maximally empty instance of [type]:
+         * nullable fields → null, collections → empty.
+         * Used to satisfy non-nullable fields when recursion must be cut off.
+         */
+        private fun createMinimalInstance(type: KType): Any? {
+            val strategies = fixture.fixtureConfiguration.strategies.toMutableMap()
+            strategies[RecursionStrategy::class] = this
+            strategies[NullabilityStrategy::class] = AlwaysNullStrategy
 
             @Suppress("DEPRECATION_ERROR")
             return fixture.create(type, configuration)
@@ -177,7 +232,7 @@ open class BaseSchemeTest {
                 })
             }
         }
-        
+
         repeat(maxOf(25 - nullableFields.size, 1)) {
             result.add(randomNull)
         }

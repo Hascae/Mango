@@ -17,13 +17,14 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.blur3.BlurredBackgroundWithFadeDrawable;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.inset.InAppKeyboardInsetView;
 import org.telegram.ui.Components.inset.WindowInsetsProvider;
 
-public class ChatInputViewsContainer extends FrameLayout {
+public class ChatInputViewsContainer extends FrameLayout implements Theme.Colorable {
     public static final int INPUT_BUBBLE_RADIUS = 22;
     public static final int INPUT_KEYBOARD_RADIUS = 29;
 
@@ -73,7 +74,8 @@ public class ChatInputViewsContainer extends FrameLayout {
 
 
 
-    private BlurredBackgroundDrawable blurredBackgroundDrawable;
+    public boolean drawInputBackground = true;
+    public BlurredBackgroundDrawable blurredBackgroundDrawable;
     private BlurredBackgroundDrawable underKeyboardBackgroundDrawable;
     public void setInputIslandBubbleDrawable(BlurredBackgroundDrawable drawable) {
         blurredBackgroundDrawable = drawable;
@@ -89,9 +91,15 @@ public class ChatInputViewsContainer extends FrameLayout {
         underKeyboardBackgroundDrawable.setIntensity(0.4f);
     }
 
+    /** also called on every theme update (Theme.Colorable) */
+    @Override
     public void updateColors() {
-        blurredBackgroundDrawable.updateColors();
-        underKeyboardBackgroundDrawable.updateColors();
+        if (blurredBackgroundDrawable != null) {
+            blurredBackgroundDrawable.updateColors();
+        }
+        if (underKeyboardBackgroundDrawable != null) {
+            underKeyboardBackgroundDrawable.updateColors();
+        }
         invalidate();
     }
 
@@ -259,13 +267,17 @@ public class ChatInputViewsContainer extends FrameLayout {
         final int blurTop = getMeasuredHeight() - currentBlurredHeight;
 
         tmpRect.set(
-            Math.round(inputBubbleOffsetLeft), 0,
-            getMeasuredWidth() - Math.round(inputBubbleOffsetRight), inputBubbleHeightRound);
+            Math.round(inputBubbleOffsetLeft),
+            0,
+            getMeasuredWidth() - Math.round(inputBubbleOffsetRight),
+            inputBubbleHeightRound
+        );
         tmpRect.inset(0, -dp(7));
         tmpRect.offset(0, blurTop + (int) bubbleInputTranlationY);
 
         blurredBackgroundDrawable.setBounds(tmpRect);
-        blurredBackgroundDrawable.draw(canvas);
+        if (drawInputBackground)
+            blurredBackgroundDrawable.draw(canvas);
 
         if (needDrawInAppKeyboard) {
             underKeyboardBackgroundDrawable.draw(canvas);

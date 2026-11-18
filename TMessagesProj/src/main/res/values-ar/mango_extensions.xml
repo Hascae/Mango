@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">ربط الوكيل</string>
     <string name="LocalHoldVerificationTitle">مصادقة التعليق المحلية</string>
     <string name="LocalHoldVerificationInfo">لقد اجتاز هذا الحساب مصادقة الطرف الثالث.</string>
-    <string name="FeedbackSupportChannel">تعليقات على المشكلات قناة خدمة العملاء</string>
-    <string name="ContactSoftwareDeveloper">اتصل بمطور البرامج</string>
     <string name="ExtensionFeatures">مركز الامتداد</string>
     <string name="ExtensionFeaturesInfo">لا يزال يتم الاحتفاظ بمفاتيح الاختصار في النقاط الثلاث في الزاوية اليمنى العليا، ويتم توفير مدخل إعداد موحد هنا.</string>
     <string name="DeviceInfoTitle">معلومات الجهاز</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">تم حذف ملف ذاكرة التخزين المؤقت</string>
     <string name="CachedFileDeleteFailed">لم يتم العثور على ملف ذاكرة التخزين المؤقت الذي يمكن حذفه</string>
     <string name="SaveStickerToGallery">حفظ الرموز في ألبوم الصور</string>
-    <string name="AccountCancellationBot">إلغاء الحساب</string>
     <string name="UnlimitedChannelJoinTitle">اختراق الحد الأعلى لإضافة القنوات يتم تمكين</string>
     <string name="UnlimitedChannelJoinInfo">بشكل افتراضي. سيقوم العميل بتقليل مطالبة الحد الأقصى لقناة الانضمام المحلية، لكن الحد الحقيقي الذي تم إرجاعه بواسطة خادم Telegram قد يظل ساريًا.</string>
     <string name="UnlimitedDialogFiltersTitle">يخترق حد التجميع</string>

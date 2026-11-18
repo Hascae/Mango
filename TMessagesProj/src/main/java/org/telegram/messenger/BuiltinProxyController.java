@@ -1,5 +1,7 @@
 package org.telegram.messenger;
 
+import org.telegram.utils.proxy.WebProxyTransport;
+import org.telegram.utils.proxy.ProxySettings;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
@@ -290,11 +292,11 @@ public class BuiltinProxyController {
             JSONArray entries = new JSONArray();
             for (SharedConfig.ProxyInfo proxy : proxies) {
                 JSONObject entry = new JSONObject();
-                entry.put("address", proxy.address);
-                entry.put("port", proxy.port);
-                entry.put("username", proxy.username);
-                entry.put("password", proxy.password);
-                entry.put("secret", proxy.secret);
+                entry.put("address", proxy.settings.getAddress());
+                entry.put("port", proxy.settings.getPort());
+                entry.put("username", proxy.settings.getUser());
+                entry.put("password", proxy.settings.getPassword());
+                entry.put("secret", proxy.settings.getSecret());
                 entry.put("name", proxy.displayName);
                 entries.put(entry);
             }
@@ -565,15 +567,8 @@ public class BuiltinProxyController {
 
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putString("proxy_ip", proxyInfo.address);
-        editor.putString("proxy_pass", proxyInfo.password);
-        editor.putString("proxy_user", proxyInfo.username);
-        editor.putInt("proxy_port", proxyInfo.port);
-        editor.putString("proxy_secret", proxyInfo.secret);
+        proxyInfo.settings.toSharedPreferences(editor);
         editor.putBoolean("proxy_enabled", enabled);
-        if (!proxyInfo.secret.isEmpty()) {
-            editor.putBoolean("proxy_enabled_calls", false);
-        }
         editor.putString(PREF_MANAGED_SIGNATURE, buildSignature(proxyInfo));
         if (markInitialized) {
             editor.putBoolean(PREF_INITIALIZED, true);
@@ -581,7 +576,7 @@ public class BuiltinProxyController {
         }
         editor.commit();
 
-        ConnectionsManager.setProxySettings(enabled, proxyInfo.address, proxyInfo.port, proxyInfo.username, proxyInfo.password, proxyInfo.secret);
+        ConnectionsManager.setProxySettings(enabled, proxyInfo.settings);
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
     }
 
@@ -595,23 +590,17 @@ public class BuiltinProxyController {
         }
 
         SharedConfig.loadProxyList();
-        SharedConfig.ProxyInfo proxyInfo = SharedConfig.addProxy(new SharedConfig.ProxyInfo(
-                address,
-                port,
-                preferences.getString("proxy_user", ""),
-                preferences.getString("proxy_pass", ""),
-                preferences.getString("proxy_secret", "")
-        ));
+        SharedConfig.ProxyInfo proxyInfo = SharedConfig.addProxy(new SharedConfig.ProxyInfo(ProxySettings.fromSharedPreferences(preferences)));
         SharedConfig.currentProxy = proxyInfo;
 
         // Always set proxy for account 0 directly, since getActivatedAccounts()
         // may return empty on first install before any user has logged in.
-        ConnectionsManager.native_setProxySettings(0, proxyInfo.address, proxyInfo.port, proxyInfo.username, proxyInfo.password, proxyInfo.secret);
+        setNativeProxy(0, proxyInfo.settings);
         int[] activatedAccounts = UserConfig.getActivatedAccounts();
         for (int i = 0; i < activatedAccounts.length; i++) {
             int account = activatedAccounts[i];
             if (account != 0) {
-                ConnectionsManager.native_setProxySettings(account, proxyInfo.address, proxyInfo.port, proxyInfo.username, proxyInfo.password, proxyInfo.secret);
+                setNativeProxy(account, proxyInfo.settings);
             }
         }
 
@@ -701,8 +690,19 @@ public class BuiltinProxyController {
         );
     }
 
+    // Account 0 is not activated before login, so its native proxy is set directly; a web proxy
+    // goes through the local transport the way ConnectionsManager does it.
+    private static void setNativeProxy(int account, ProxySettings settings) {
+        if (settings.getType() == ProxySettings.Type.WEB) {
+            final int localPort = WebProxyTransport.start(settings.getAddress(), settings.getSecret());
+            ConnectionsManager.native_setProxySettings(account, "127.0.0.1", localPort != 0 ? localPort : 9, "", "", settings.getSecret());
+        } else {
+            ConnectionsManager.native_setProxySettings(account, settings.getAddress(), settings.getPort(), settings.getUser(), settings.getPassword(), settings.getSecret());
+        }
+    }
+
     private static String buildSignature(SharedConfig.ProxyInfo proxyInfo) {
-        return buildSignature(proxyInfo.address, proxyInfo.port, proxyInfo.username, proxyInfo.password, proxyInfo.secret);
+        return buildSignature(proxyInfo.settings.getAddress(), proxyInfo.settings.getPort(), proxyInfo.settings.getUser(), proxyInfo.settings.getPassword(), proxyInfo.settings.getSecret());
     }
 
     private static String buildSignature(String address, int port, String username, String password, String secret) {

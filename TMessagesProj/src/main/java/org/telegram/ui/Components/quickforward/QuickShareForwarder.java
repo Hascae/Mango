@@ -1,5 +1,6 @@
 package org.telegram.ui.Components.quickforward;
 
+import org.telegram.messenger.SendMessageChatArguments;
 import android.text.TextUtils;
 
 import org.telegram.messenger.AccountInstance;
@@ -124,7 +125,7 @@ public final class QuickShareForwarder {
             if (media instanceof TLRPC.TL_messageMediaPhoto) {
                 SendMessagesHelper.prepareSendingPhoto(
                         targetInstance, path, null, destination.dialogId, null, null, null,
-                        caption, entities, null, null, 0, null, true, 0, 0, null, 0
+                        caption, entities, null, null, 0, null, true, 0, 0, SendMessageChatArguments.EMPTY
                 );
             } else {
                 ArrayList<String> paths = new ArrayList<>();
@@ -134,7 +135,7 @@ public final class QuickShareForwarder {
                 SendMessagesHelper.prepareSendingDocuments(
                         targetInstance, paths, originalPaths, null, caption, entities, null,
                         destination.dialogId, null, null, null, null, null, true, 0, 0,
-                        null, null, 0, 0, false, 0, 0, null
+                        null, SendMessageChatArguments.EMPTY, 0, false, 0, 0, null
                 );
             }
         }

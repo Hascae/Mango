@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">Подключить прокси</string>
     <string name="LocalHoldVerificationTitle">Локальная проверка подлинности с удержанием</string>
     <string name="LocalHoldVerificationInfo">Эта учетная запись прошла стороннюю проверку подлинности с удержанием.</string>
-    <string name="FeedbackSupportChannel">Канал обслуживания клиентов для обратной связи о проблемах</string>
-    <string name="ContactSoftwareDeveloper">Связаться с разработчиком программного обеспечения</string>
     <string name="ExtensionFeatures">Центр расширений</string>
     <string name="ExtensionFeaturesInfo">Ярлыки в трех точках в правом верхнем углу по-прежнему сохраняются, и здесь предоставляется единый вход в настройки.</string>
     <string name="DeviceInfoTitle">Информация об устройстве</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">Файл кэша удален</string>
     <string name="CachedFileDeleteFailed">Не найден файл кэша, который можно удалить</string>
     <string name="SaveStickerToGallery">Сохраняем смайлы в фотоальбом</string>
-    <string name="AccountCancellationBot">Отменить учетную запись</string>
     <string name="UnlimitedChannelJoinTitle">Превышение верхнего предела добавления каналов</string>
     <string name="UnlimitedChannelJoinInfo">включен по умолчанию. Клиент уменьшит запрос на ограничение локального канала присоединения, но реальный лимит, возвращаемый сервером Telegram, может все еще действовать.</string>
     <string name="UnlimitedDialogFiltersTitle">Превышает лимит группировки.</string>
