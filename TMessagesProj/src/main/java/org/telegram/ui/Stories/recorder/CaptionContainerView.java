@@ -62,6 +62,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.AdjustPanLayoutHelper;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.AnimatedTextView;
@@ -307,6 +308,11 @@ public class CaptionContainerView extends FrameLayout {
                 }
                 return true;
             }
+
+            @Override
+            protected void onLineCountChanged(int oldLineCount, int newLineCount) {
+                CaptionContainerView.this.onLineCountChanged(oldLineCount, newLineCount);
+            }
         };
         editText.glassDesignForEmojiView = true;
         editText.getEditText().addTextChangedListener(new EditTextSuggestionsFix());
@@ -393,18 +399,15 @@ public class CaptionContainerView extends FrameLayout {
         applyButton = new BounceableImageView(context);
         ScaleStateListAnimator.apply(applyButton, 0.05f, 1.25f);
         applyButtonCheck = context.getResources().getDrawable(R.drawable.input_done).mutate();
-        applyButtonCheck.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_dialogFloatingIcon), PorterDuff.Mode.SRC_IN));
+        ThemeBind.drawableColorFilter(this, applyButtonCheck, Theme.key_dialogFloatingIcon, PorterDuff.Mode.SRC_IN);
         applyButtonDrawable = new CombinedDrawable(Theme.createCircleDrawable(AndroidUtilities.dp(18), Theme.getColor(Theme.key_chat_editMediaButton, resourcesProvider)), applyButtonCheck, 0, AndroidUtilities.dp(1));
         applyButtonDrawable.setCustomSize(AndroidUtilities.dp(36), AndroidUtilities.dp(36));
         applyButton.setImageDrawable(applyButtonDrawable);
         applyButton.setScaleType(ImageView.ScaleType.CENTER);
+        applyButton.setContentDescription(LocaleController.getString(R.string.Done));
         applyButton.setAlpha(0f);
         applyButton.setVisibility(View.GONE);
-        applyButton.setOnClickListener(e -> {
-            closeKeyboard();
-            AndroidUtilities.cancelRunOnUIThread(textChangeRunnable);
-            textChangeRunnable.run();
-        });
+        applyButton.setOnClickListener(e -> done());
         addView(applyButton, LayoutHelper.createFrame(44, 44, Gravity.RIGHT | (isAtTop() ? Gravity.TOP : Gravity.BOTTOM), 8, 8, 8, 8));
 
         limitTextView = new AnimatedTextView(context, false, true, true);
@@ -422,8 +425,15 @@ public class CaptionContainerView extends FrameLayout {
         fadePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
     }
 
+    protected void onLineCountChanged(int oldLineCount, int newLineCount) {
+
+    }
+
     public void setDialogId(long dialogId) {
         this.dialogId = dialogId;
+        if (mentionContainer != null) {
+            mentionContainer.setDialogId(dialogId);
+        }
     }
 
     public int additionalRightMargin() {
@@ -432,6 +442,12 @@ public class CaptionContainerView extends FrameLayout {
 
     private final Runnable textChangeRunnable = () -> onTextChange();
     protected void onTextChange() {}
+
+    protected void done() {
+        closeKeyboard();
+        AndroidUtilities.cancelRunOnUIThread(textChangeRunnable);
+        textChangeRunnable.run();
+    }
 
     public void invalidateBlur() {
         invalidate();
@@ -531,7 +547,7 @@ public class CaptionContainerView extends FrameLayout {
 
 
     private void createMentionsContainer() {
-        mentionContainer = new MentionsContainerView(getContext(), UserConfig.getInstance(currentAccount).getClientUserId(), 0, LaunchActivity.getLastFragment(), new DarkThemeResourceProvider()) {
+        mentionContainer = new MentionsContainerView(getContext(), dialogId, 0, LaunchActivity.getLastFragment(), new DarkThemeResourceProvider()) {
             @Override
             public void drawRoundRect(Canvas canvas, Rect rectTmp, float radius) {
                 rectF.set(rectTmp);
@@ -576,7 +592,7 @@ public class CaptionContainerView extends FrameLayout {
         mentionContainer.getAdapter().setAllowStickers(false);
         mentionContainer.getAdapter().setAllowBots(false);
         mentionContainer.getAdapter().setAllowChats(false);
-        mentionContainer.getAdapter().setSearchInDailogs(true);
+        mentionContainer.getAdapter().setSearchInDialogs(this instanceof CaptionStory);
     }
 
     private void replaceWithText(int start, int len, CharSequence text, boolean parseEmoji) {

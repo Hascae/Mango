@@ -2,6 +2,7 @@ package org.telegram.ui.Components.voip;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 
+import org.telegram.messenger.FileLog;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -39,7 +40,6 @@ import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.ImageLoader;
@@ -59,6 +59,7 @@ import org.telegram.messenger.voip.VoIPService;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BlobDrawable;
 import org.telegram.ui.Components.CrossOutDrawable;
@@ -564,7 +565,7 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
         noRtmpStreamTextView = new TextView(parentContainer.getContext());
         noRtmpStreamTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         noRtmpStreamTextView.setPadding(dp(21), 0, dp(21), 0);
-        noRtmpStreamTextView.setTextColor(Theme.getColor(Theme.key_voipgroup_lastSeenText));
+        ThemeBind.textColor(noRtmpStreamTextView, Theme.key_voipgroup_lastSeenText);
         noRtmpStreamTextView.setBackground(rippleDrawable);
         noRtmpStreamTextView.setGravity(Gravity.CENTER);
         noRtmpStreamTextView.setAlpha(0f);
@@ -1127,14 +1128,14 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
                 if (DialogObject.isUserDialog(peerId)) {
                     TLRPC.User currentUser = AccountInstance.getInstance(currentAccount).getMessagesController().getUser(peerId);
                     noVideoStubLayout.avatarDrawable.setInfo(currentAccount, currentUser);
-                    imageLocation = ImageLocation.getForUser(currentUser, ImageLocation.TYPE_BIG);
-                    thumbLocation = ImageLocation.getForUser(currentUser, ImageLocation.TYPE_SMALL);
+                    imageLocation = ImageLocation.getForUser(currentAccount, currentUser, ImageLocation.TYPE_BIG);
+                    thumbLocation = ImageLocation.getForUser(currentAccount, currentUser, ImageLocation.TYPE_SMALL);
                     parentObject = currentUser;
                 } else {
                     TLRPC.Chat currentChat = AccountInstance.getInstance(UserConfig.selectedAccount).getMessagesController().getChat(-peerId);
                     noVideoStubLayout.avatarDrawable.setInfo(currentAccount, currentChat);
-                    imageLocation = ImageLocation.getForChat(currentChat, ImageLocation.TYPE_BIG);
-                    thumbLocation = ImageLocation.getForChat(currentChat, ImageLocation.TYPE_SMALL);
+                    imageLocation = ImageLocation.getForChat(currentAccount, currentChat, ImageLocation.TYPE_BIG);
+                    thumbLocation = ImageLocation.getForChat(currentAccount, currentChat, ImageLocation.TYPE_SMALL);
                     parentObject = currentChat;
                 }
 
@@ -1274,13 +1275,13 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
             } else {
                 if (peerId > 0) {
                     TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(peerId);
-                    ImageLocation imageLocation = ImageLocation.getForUser(user, ImageLocation.TYPE_SMALL);
+                    ImageLocation imageLocation = ImageLocation.getForUser(currentAccount, user, ImageLocation.TYPE_SMALL);
                     int color = user != null ? AvatarDrawable.getColorForId(user.id) : ColorUtils.blendARGB(Color.BLACK, Color.WHITE, 0.2f);
                     GradientDrawable gradientDrawable = new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[]{ColorUtils.blendARGB(color, Color.BLACK, 0.2f), ColorUtils.blendARGB(color, Color.BLACK, 0.4f)});
                     imageReceiver.setImage(imageLocation, "50_50_b", gradientDrawable, null, user, 0);
                 } else {
                     TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-peerId);
-                    ImageLocation imageLocation = ImageLocation.getForChat(chat, ImageLocation.TYPE_SMALL);
+                    ImageLocation imageLocation = ImageLocation.getForChat(currentAccount, chat, ImageLocation.TYPE_SMALL);
                     int color = chat != null ? AvatarDrawable.getColorForId(chat.id) : ColorUtils.blendARGB(Color.BLACK, Color.WHITE, 0.2f);
                     GradientDrawable gradientDrawable = new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[]{ColorUtils.blendARGB(color, Color.BLACK, 0.2f), ColorUtils.blendARGB(color, Color.BLACK, 0.4f)});
                     imageReceiver.setImage(imageLocation, "50_50_b", gradientDrawable, null, chat, 0);
@@ -1457,7 +1458,8 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
                     VoIPService.getSharedInstance().setLocalSink(null, participant.presentation);
                 }
             } else {
-                if (VoIPService.getSharedInstance() != null && !RTMPStreamPipOverlay.isVisible()) {
+                // a PiP window keeps its own receiver of the stream (VoIPService extra sinks)
+                if (VoIPService.getSharedInstance() != null) {
                     VoIPService.getSharedInstance().removeRemoteSink(participant.participant, participant.presentation);
                 }
             }
@@ -1617,7 +1619,7 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
         }
     }
 
-    private class NoVideoStubLayout extends View {
+    private class NoVideoStubLayout extends View implements Theme.Colorable {
 
         public ImageReceiver avatarImageReceiver = new ImageReceiver();
         public ImageReceiver backgroundImageReceiver = new ImageReceiver();
@@ -1808,7 +1810,18 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
             avatarImageReceiver.onDetachedFromWindow();
             backgroundImageReceiver.onDetachedFromWindow();
         }
-    }
+    
+        @Override
+        public void updateColors() {
+            try {
+                paint.setColor(ColorUtils.blendARGB(Theme.getColor(Theme.key_voipgroup_listeningText), Theme.getColor(Theme.key_voipgroup_speakingText), speakingProgress));
+                invalidate();
+        
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+}
 
     public String getName() {
         long peerId = MessageObject.getPeerId(participant.participant.peer);
@@ -1851,7 +1864,7 @@ public class GroupCallMiniTextureView extends FrameLayout implements GroupCallSt
         if (textureView.renderer.isFirstFrameRendered()) {
             Bitmap bitmap = textureView.blurRenderer.getBitmap(100, 100);
             if (bitmap != null) {
-                Utilities.blurBitmap(bitmap, 3, 1, bitmap.getWidth(), bitmap.getHeight(), bitmap.getRowBytes());
+                Utilities.blurBitmap(bitmap, 3);
                 Drawable drawable = new BitmapDrawable(bitmap);
                 blurredFlippingStub.setBackground(drawable);
             }

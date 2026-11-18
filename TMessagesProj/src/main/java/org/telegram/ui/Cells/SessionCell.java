@@ -9,6 +9,8 @@
 package org.telegram.ui.Cells;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.LocaleController.formatString;
+import static org.telegram.messenger.LocaleController.getString;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -42,7 +44,9 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.tl.TL_account;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
@@ -92,6 +96,8 @@ public class SessionCell extends FrameLayout {
             placeholderImageView.setRoundRadius(dp(10));
             addView(placeholderImageView, LayoutHelper.createFrame(42, 42, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, (LocaleController.isRTL ? 0 : 16), 9, (LocaleController.isRTL ? 16 : 0), 0));
 
+            avatarDrawable = new AvatarDrawable();
+
             imageView = new BackupImageView(context);
             imageView.setRoundRadius(dp(10));
             addView(imageView, LayoutHelper.createFrame(42, 42, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, (LocaleController.isRTL ? 0 : 16), 9, (LocaleController.isRTL ? 16 : 0), 0));
@@ -101,7 +107,7 @@ public class SessionCell extends FrameLayout {
 
 
         nameTextView = new TextView(context);
-        nameTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        ThemeBind.textColor(nameTextView, Theme.key_windowBackgroundWhiteBlackText);
         nameTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, type == 0 ? 15 : 16);
         nameTextView.setLines(1);
         nameTextView.setTypeface(AndroidUtilities.bold());
@@ -133,7 +139,7 @@ public class SessionCell extends FrameLayout {
         }
 
         detailTextView = new TextView(context);
-        detailTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        ThemeBind.textColor(detailTextView, Theme.key_windowBackgroundWhiteBlackText);
         detailTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, type == 0 ? 13 : 14);
         detailTextView.setLines(1);
         detailTextView.setMaxLines(1);
@@ -143,7 +149,7 @@ public class SessionCell extends FrameLayout {
         addView(detailTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, leftMargin, type == 0 ? 28 : 36, rightMargin, 0));
 
         detailExTextView = new TextView(context);
-        detailExTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3));
+        ThemeBind.textColor(detailExTextView, Theme.key_windowBackgroundWhiteGrayText3);
         detailExTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, type == 0 ? 13 : 14);
         detailExTextView.setLines(1);
         detailExTextView.setMaxLines(1);
@@ -185,8 +191,23 @@ public class SessionCell extends FrameLayout {
     public void setSession(TLObject object, boolean divider) {
         needDivider = divider;
 
-        if (object instanceof TLRPC.TL_authorization) {
-            TLRPC.TL_authorization session = (TLRPC.TL_authorization) object;
+        imageView.setRoundRadius(dp(10));
+
+        if (object instanceof TL_account.TL_connectedBot) {
+            final TL_account.TL_connectedBot bot = (TL_account.TL_connectedBot) object;
+            final TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(bot.bot_id);
+
+            avatarDrawable.setInfo(user);
+            imageView.setRoundRadius(dp(21));
+            imageView.setForUserOrChat(user, avatarDrawable);
+
+            nameTextView.setText(UserObject.getUserName(user));
+            detailTextView.setText(getString(R.string.SessionBot));
+            if (TLObject.hasFlag(bot.flags, TLObject.FLAG_1)) {
+                detailExTextView.setText(formatString(R.string.SessionBotConnectedOn, LocaleController.formatDateTime(bot.date, false)));
+            }
+        } else if (object instanceof TLRPC.TL_authorization) {
+            final TLRPC.TL_authorization session = (TLRPC.TL_authorization) object;
             imageView.setImageDrawable(createDrawable(42, session));
 
             StringBuilder stringBuilder = new StringBuilder();
@@ -209,7 +230,7 @@ public class SessionCell extends FrameLayout {
             String timeText;
             if ((session.flags & 1) != 0) {
                 setTag(Theme.key_windowBackgroundWhiteValueText);
-                timeText = LocaleController.getString(R.string.Online);
+                timeText = getString(R.string.Online);
             } else {
                 setTag(Theme.key_windowBackgroundWhiteGrayText3);
                 timeText = LocaleController.stringForMessageListDate(session.date_active);
@@ -222,6 +243,8 @@ public class SessionCell extends FrameLayout {
             if (spannableStringBuilder.length() != 0) {
                 DotDividerSpan dotDividerSpan = new DotDividerSpan();
                 dotDividerSpan.setTopPadding(dp(1.5f));
+                dotDividerSpan.setSize(7);
+                dotDividerSpan.setDotSize(2);
                 spannableStringBuilder.append(" . ").setSpan(dotDividerSpan, spannableStringBuilder.length() - 2, spannableStringBuilder.length() - 1, 0);
             }
             spannableStringBuilder.append(timeText);
@@ -247,7 +270,7 @@ public class SessionCell extends FrameLayout {
 
             setTag(Theme.key_windowBackgroundWhiteGrayText3);
             onlineTextView.setText(LocaleController.stringForMessageListDate(session.date_active));
-            onlineTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3));
+            ThemeBind.textColor(onlineTextView, Theme.key_windowBackgroundWhiteGrayText3);
 
             StringBuilder stringBuilder = new StringBuilder();
             if (session.ip.length() != 0) {
@@ -480,9 +503,11 @@ public class SessionCell extends FrameLayout {
         this.globalGradient = globalGradient;
         showStub = true;
 
-        Drawable iconDrawable = ContextCompat.getDrawable(ApplicationLoader.applicationContext, AndroidUtilities.isTablet() ? R.drawable.device_tablet_android : R.drawable.device_phone_android).mutate();
-        iconDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_avatar_text), PorterDuff.Mode.SRC_IN));
-        CombinedDrawable combinedDrawable = new CombinedDrawable(Theme.createCircleDrawable(dp(42), Theme.getColor(Theme.key_avatar_backgroundGreen)), iconDrawable);
+        final TLRPC.TL_authorization auth = new TLRPC.TL_authorization();
+        auth.platform = "android";
+        auth.device_model = (android.os.Build.MANUFACTURER + android.os.Build.MODEL);
+        auth.app_name = "";
+        CombinedDrawable combinedDrawable = createDrawable(42, auth);
         if (placeholderImageView != null) {
             placeholderImageView.setImageDrawable(combinedDrawable);
         } else {

@@ -11,20 +11,20 @@ import android.graphics.drawable.Drawable;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ChatBackgroundDrawable;
 import org.telegram.ui.Components.MotionBackgroundDrawable;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSource;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceBitmap;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceWrapped;
+import org.telegram.utils.glass.source.GlassSource;
+import org.telegram.utils.glass.source.GlassSourceBitmap;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceWrapped;
 import org.telegram.ui.Components.blur3.utils.BitmapMemoizedMetadata;
 
 public class WallpaperBitmapProvider {
 
-    private final BlurredBackgroundSourceColor sourceColor = new BlurredBackgroundSourceColor();
-    private final BlurredBackgroundSourceBitmap sourceBitmap = new BlurredBackgroundSourceBitmap();
+    private final GlassSourceColor sourceColor = new GlassSourceColor();
+    private final GlassSourceBitmap sourceBitmap = new GlassSourceBitmap();
 
     private static final Rect tmpRect = new Rect();
 
-    public BlurredBackgroundSource updateSourceFromBackgroundViewDrawable(
+    public GlassSource updateSourceFromBackgroundViewDrawable(
         Drawable drawable
     ) {
         if (drawable instanceof ColorDrawable) {
@@ -67,18 +67,35 @@ public class WallpaperBitmapProvider {
         return sourceBitmap;
     }
 
-    public int getNavigationBarColor(BlurredBackgroundSource source) {
-        if (source instanceof BlurredBackgroundSourceColor) {
-            return ((BlurredBackgroundSourceColor) source).getColor();
+    public int getNavigationBarColor(GlassSource source) {
+        if (source instanceof GlassSourceColor) {
+            return ((GlassSourceColor) source).getColor();
         }
 
-        if (source instanceof BlurredBackgroundSourceBitmap) {
-            final Bitmap bitmap = ((BlurredBackgroundSourceBitmap) source).getBitmap();
+        if (source instanceof GlassSourceBitmap) {
+            final Bitmap bitmap = ((GlassSourceBitmap) source).getBitmap();
             return navbarColorFromBitmap.get(bitmap);
         }
 
-        if (source instanceof BlurredBackgroundSourceWrapped) {
-            return getNavigationBarColor(((BlurredBackgroundSourceWrapped) source).getSource());
+        if (source instanceof GlassSourceWrapped) {
+            return getNavigationBarColor(((GlassSourceWrapped) source).getSource());
+        }
+
+        return 0;
+    }
+
+    public int getStatusBarColor(GlassSource source) {
+        if (source instanceof GlassSourceColor) {
+            return ((GlassSourceColor) source).getColor();
+        }
+
+        if (source instanceof GlassSourceBitmap) {
+            final Bitmap bitmap = ((GlassSourceBitmap) source).getBitmap();
+            return statusBarColorFromBitmap.get(bitmap);
+        }
+
+        if (source instanceof GlassSourceWrapped) {
+            return getStatusBarColor(((GlassSourceWrapped) source).getSource());
         }
 
         return 0;
@@ -86,6 +103,8 @@ public class WallpaperBitmapProvider {
 
     private final BitmapMemoizedMetadata<Bitmap> blurredFromBitmap = new BitmapMemoizedMetadata<>(WallpaperBitmapProvider::blurBitmap);
     private final BitmapMemoizedMetadata<Integer> navbarColorFromBitmap = new BitmapMemoizedMetadata<>(WallpaperBitmapProvider::averageBottomColor);
+    private final BitmapMemoizedMetadata<Integer> statusBarColorFromBitmap = new BitmapMemoizedMetadata<>(WallpaperBitmapProvider::averageTopColor);
+
 
     private static Bitmap blurBitmap(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
@@ -98,41 +117,28 @@ public class WallpaperBitmapProvider {
         return result;
     }
 
+
+
+    private static int averageTopColor(Bitmap bitmap) {
+        if (bitmap == null || bitmap.isRecycled()) {
+            return 0;
+        }
+
+        final int height = bitmap.getHeight();
+        final int width = bitmap.getWidth();
+        final int bottom = height / 10;
+        return Utilities.averageBitmapColor(bitmap, 0, 0, width, bottom);
+    }
+
     private static int averageBottomColor(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
             return 0;
         }
 
-        int height = bitmap.getHeight();
-        int width = bitmap.getWidth();
-        int bottomHeight = (int) (height * 0.1f);
-        int startY = height - bottomHeight;
-
-        long sumR = 0;
-        long sumG = 0;
-        long sumB = 0;
-        long sumA = 0;
-        int count = 0;
-
-        int[] pixels = new int[width * bottomHeight];
-        bitmap.getPixels(pixels, 0, width, 0, startY, width, bottomHeight);
-
-        for (int color : pixels) {
-            sumA += (color >>> 24) & 0xFF;
-            sumR += (color >> 16) & 0xFF;
-            sumG += (color >> 8) & 0xFF;
-            sumB += color & 0xFF;
-            count++;
-        }
-
-        if (count == 0) return Color.TRANSPARENT;
-
-        int a = (int) (sumA / count);
-        int r = (int) (sumR / count);
-        int g = (int) (sumG / count);
-        int b = (int) (sumB / count);
-
-        return Color.argb(a, r, g, b);
+        final int height = bitmap.getHeight();
+        final int width = bitmap.getWidth();
+        final int top = height * 9 / 10;
+        return Utilities.averageBitmapColor(bitmap, 0, top, width, height);
     }
 
 }

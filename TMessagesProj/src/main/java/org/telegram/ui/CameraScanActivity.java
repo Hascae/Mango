@@ -7,11 +7,11 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -48,6 +48,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 import androidx.dynamicanimation.animation.FloatValueHolder;
 import androidx.dynamicanimation.animation.SpringAnimation;
@@ -83,6 +84,7 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Components.AnimationProperties;
 import org.telegram.ui.Components.CubicBezierInterpolator;
@@ -95,10 +97,11 @@ import org.telegram.ui.Components.URLSpanNoUnderline;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 
-@TargetApi(18)
 public class CameraScanActivity extends BaseFragment {
 
+    private @Nullable OrientationController.Request portraitRequest;
     private TextView titleTextView;
     private TextView descriptionText;
     private CameraView cameraView;
@@ -302,8 +305,9 @@ public class CameraScanActivity extends BaseFragment {
         AndroidUtilities.cancelRunOnUIThread(requestShot);
         super.onFragmentDestroy();
         destroy(false, null);
-        if (getParentActivity() != null) {
-            getParentActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        if (portraitRequest != null) {
+            portraitRequest.release();
+            portraitRequest = null;
         }
         if (visionQrReader != null) {
             visionQrReader.release();
@@ -317,7 +321,12 @@ public class CameraScanActivity extends BaseFragment {
             actionBar.setItemsColor(0xffffffff, false);
             actionBar.setItemsBackgroundColor(0xffffffff, false);
             actionBar.setTitleColor(0xffffffff);
+        } else if (currentType == TYPE_MRZ) {
+            ThemeBind.actionBarItemsColor(actionBar, Theme.key_windowBackgroundWhiteGrayText2, false);
+            ThemeBind.actionBarItemsBackgroundColor(actionBar, Theme.key_actionBarWhiteSelector, false);
+            ThemeBind.actionBarTitleColor(actionBar, Theme.key_actionBarDefaultTitle);
         } else {
+            // overwritten with fixed white below (camera backdrop): no theme binding
             actionBar.setItemsColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2), false);
             actionBar.setItemsBackgroundColor(Theme.getColor(Theme.key_actionBarWhiteSelector), false);
             actionBar.setTitleColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
@@ -522,8 +531,8 @@ public class CameraScanActivity extends BaseFragment {
         }
 
         if (currentType == TYPE_MRZ) {
-            actionBar.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-            fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            ThemeBind.backgroundColor(actionBar, Theme.key_windowBackgroundWhite);
+            ThemeBind.backgroundColor(fragmentView, Theme.key_windowBackgroundWhite);
         } else {
             actionBar.setBackgroundDrawable(null);
             actionBar.setAddToContainer(false);
@@ -633,7 +642,11 @@ public class CameraScanActivity extends BaseFragment {
         viewGroup.addView(titleTextView);
 
         descriptionText = new TextView(context);
-        descriptionText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
+        if (currentType == TYPE_QR_WEB_BOT) {
+            descriptionText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6)); // overwritten with fixed white below
+        } else {
+            ThemeBind.textColor(descriptionText, Theme.key_windowBackgroundWhiteGrayText6);
+        }
         descriptionText.setGravity(Gravity.CENTER_HORIZONTAL);
         descriptionText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         viewGroup.addView(descriptionText);
@@ -646,7 +659,7 @@ public class CameraScanActivity extends BaseFragment {
         if (currentType == TYPE_MRZ) {
             titleTextView.setText(LocaleController.getString(R.string.PassportScanPassport));
             descriptionText.setText(LocaleController.getString(R.string.PassportScanPassportInfo));
-            titleTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            ThemeBind.textColor(titleTextView, Theme.key_windowBackgroundWhiteBlackText);
             recognizedMrzView.setTypeface(Typeface.MONOSPACE);
         } else {
             if (needGalleryButton && currentType != TYPE_QR_LOGIN) {
@@ -751,8 +764,9 @@ public class CameraScanActivity extends BaseFragment {
             });
         }
 
-        if (getParentActivity() != null) {
-            getParentActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        final OrientationController orientation = OrientationController.of(getParentActivity());
+        if (orientation != null && portraitRequest == null) {
+            portraitRequest = orientation.requestPortrait();
         }
         fragmentView.setKeepScreenOn(true);
 
@@ -929,8 +943,8 @@ public class CameraScanActivity extends BaseFragment {
         if (normalBounds == null) {
             normalBounds = new RectF();
         }
-        int width = Math.max(AndroidUtilities.displaySize.x, fragmentView.getWidth()),
-            height = Math.max(AndroidUtilities.displaySize.y, fragmentView.getHeight()),
+        int width = fragmentView.getWidth(),
+            height = fragmentView.getHeight(),
             side = (int) (Math.min(width, height) / 1.5f);
         normalBounds.set(
             (width - side) / 2f / (float) width,
@@ -1601,11 +1615,7 @@ public class CameraScanActivity extends BaseFragment {
             return themeDescriptions;
         }
 
-        themeDescriptions.add(new ThemeDescription(fragmentView, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_windowBackgroundWhite));
 
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_windowBackgroundWhite));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_ITEMSCOLOR, null, null, null, null, Theme.key_windowBackgroundWhiteGrayText2));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_SELECTORCOLOR, null, null, null, null, Theme.key_actionBarWhiteSelector));
 
         themeDescriptions.add(new ThemeDescription(titleTextView, ThemeDescription.FLAG_AB_SELECTORCOLOR, null, null, null, null, Theme.key_windowBackgroundWhiteBlackText));
         themeDescriptions.add(new ThemeDescription(descriptionText, ThemeDescription.FLAG_AB_SELECTORCOLOR, null, null, null, null, Theme.key_windowBackgroundWhiteGrayText6));

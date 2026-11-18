@@ -23,6 +23,7 @@ import android.graphics.ColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
@@ -92,6 +93,7 @@ import org.telegram.ui.ActionBar.AdjustPanLayoutHelper;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.BubbleActivity;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
@@ -137,7 +139,6 @@ import org.telegram.ui.Components.Paint.Views.RoundView;
 import org.telegram.ui.Components.Paint.Views.StickerView;
 import org.telegram.ui.Components.Paint.Views.TextPaintView;
 import org.telegram.ui.Components.Paint.Views.WeatherView;
-import org.telegram.ui.Components.Point;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
@@ -157,6 +158,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashSet;
 
 public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPaintView, PaintToolsView.Delegate, EntityView.EntityViewDelegate, PaintTextOptionsView.Delegate, SizeNotifierFrameLayout.SizeNotifierFrameLayoutDelegate, StoryRecorder.Touchable {
     private PaintCancelView cancelButton;
@@ -373,6 +375,11 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
             @Override
             public Paint getPaint(String paintKey) {
                 return resourcesProvider.getPaint(paintKey);
+            }
+
+            @Override
+            public boolean isDark() {
+                return true;
             }
 
             private ColorFilter animatedEmojiColorFilter;
@@ -1198,7 +1205,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         forceChanges = true;
 
         Size paintingSize = getPaintingSize();
-        Point position = startPositionRelativeToEntity(null);
+        PointF position = startPositionRelativeToEntity(null);
         float w = entitiesView.getMeasuredWidth() <= 0 ? this.w : entitiesView.getMeasuredWidth();
         int maxWidth = (int) w - dp(14 + 26 + 18);
         LocationView view = new LocationView(getContext(), position, currentAccount, location, mediaArea, w / 240f, maxWidth);
@@ -1233,7 +1240,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         forceChanges = true;
 
         Size paintingSize = getPaintingSize();
-        Point position = startPositionRelativeToEntity(null);
+        PointF position = startPositionRelativeToEntity(null);
         float w = entitiesView.getMeasuredWidth() <= 0 ? this.w : entitiesView.getMeasuredWidth();
         int maxWidth = (int) w - dp(14 + 26 + 18);
         WeatherView view = new WeatherView(getContext(), position, currentAccount, weather, w / 240f, maxWidth);
@@ -1268,7 +1275,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         forceChanges = true;
 
         Size paintingSize = getPaintingSize();
-        Point position = startPositionRelativeToEntity(null);
+        PointF position = startPositionRelativeToEntity(null);
         float w = entitiesView.getMeasuredWidth() <= 0 ? this.w : entitiesView.getMeasuredWidth();
         int maxWidth = (int) w - dp(14 + 26 + 18);
         LinkView view = new LinkView(getContext(), position, currentAccount, link, mediaArea, w / 360f, maxWidth, 3);
@@ -1301,7 +1308,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         onTextAdd();
 
         Size paintingSize = getPaintingSize();
-        Point position = startPositionRelativeToEntity(null);
+        PointF position = startPositionRelativeToEntity(null);
         TextPaintView view = new TextPaintView(getContext(), position, (int) (paintingSize.width / 9), "", colorSwatch, selectedTextType);
         view.setMinMaxFontSize((int) (0.5f * (paintingSize.width / 9f)), (int) (2f * (paintingSize.width / 9f)), () -> {
             if (weightChooserView != null) {
@@ -1766,7 +1773,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
         drawTab = new TextView(context);
         drawTab.setText(getString(R.string.PhotoEditorDraw).toUpperCase());
-        drawTab.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ROUNDRECT_6DP));
+        ThemeBind.selectorBackground(drawTab, Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ROUNDRECT_6DP), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
         drawTab.setPadding(0, dp(8), 0, dp(8));
         drawTab.setTextColor(Color.WHITE);
         drawTab.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -1784,7 +1791,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
         stickerTab = new TextView(context);
         stickerTab.setText(getString(R.string.PhotoEditorSticker).toUpperCase());
-        stickerTab.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ROUNDRECT_6DP));
+        ThemeBind.selectorBackground(stickerTab, Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ROUNDRECT_6DP), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
         stickerTab.setPadding(0, dp(8), 0, dp(8));
         stickerTab.setOnClickListener(v -> openStickersView());
         stickerTab.setTextColor(Color.WHITE);
@@ -1797,7 +1804,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
         textTab = new TextView(context);
         textTab.setText(getString(R.string.PhotoEditorText).toUpperCase());
-        textTab.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ROUNDRECT_6DP));
+        ThemeBind.selectorBackground(textTab, Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ROUNDRECT_6DP), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
         textTab.setPadding(0, dp(8), 0, dp(8));
         textTab.setTextColor(Color.WHITE);
         textTab.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -2199,7 +2206,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     }
 
     private void showAudioAlert(Utilities.Callback<MessageObject> onAudioSelected) {
-        final SelectAudioAlert sheet = new SelectAudioAlert(getContext(), onAudioSelected);
+        final SelectAudioAlert sheet = new SelectAudioAlert(getContext(), onAudioSelected, new DarkThemeResourceProvider());
         sheet.setOnDismissListener(() -> {
             onOpenCloseStickersAlert(false);
         });
@@ -2475,7 +2482,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                         linkView.marker.setupLayout();
                         entity.viewWidth = linkView.marker.padx + (int) Math.ceil(linkView.marker.w) + linkView.marker.padx;
                         entity.viewHeight = linkView.marker.pady + (int) Math.ceil(linkView.marker.h) + linkView.marker.pady;
-                        Point p = linkView.getPosition();
+                        PointF p = linkView.getPosition();
                         p.y += .3f * h;
                         linkView.setPosition(p);
                         continue;
@@ -2508,7 +2515,9 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                 }
                 view.setX(entity.x * w - entity.viewWidth * (1 - entity.scale) / 2);
                 view.setY(entity.y * h - entity.viewHeight * (1 - entity.scale) / 2);
-                view.setPosition(new Point(view.getX() + entity.viewWidth / 2f, view.getY() + entity.viewHeight / 2f));
+                float x = view.getX() + entity.viewWidth / 2f;
+                float y = view.getY() + entity.viewHeight / 2f;
+                view.setPosition(new PointF(x, y));
                 view.setScale(entity.scale);
                 view.setRotation((float) (-entity.rotation / Math.PI * 180));
             }
@@ -2613,6 +2622,27 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     public void updateColors() {
         toolsPaint.setColor(0xff191919);
     }
+    @Override
+    public void addColorKeys(HashSet<Integer> colors) {
+        colors.add(Theme.key_actionBarDefaultSubmenuBackground);
+        colors.add(Theme.key_dialogBackground);
+        colors.add(Theme.key_dialogTextBlack);
+        colors.add(Theme.key_dialogTextGray3);
+        colors.add(Theme.key_chat_emojiPanelBackground);
+        colors.add(Theme.key_chat_emojiPanelShadowLine);
+        colors.add(Theme.key_chat_emojiBottomPanelIcon);
+        colors.add(Theme.key_chat_emojiPanelBackspace);
+        colors.add(Theme.key_chat_emojiPanelIcon);
+        colors.add(Theme.key_windowBackgroundWhiteBlackText);
+        colors.add(Theme.key_featuredStickers_addedIcon);
+        colors.add(Theme.key_profile_tabSelectedText);
+        colors.add(Theme.key_profile_tabText);
+        colors.add(Theme.key_profile_tabSelectedLine);
+        colors.add(Theme.key_profile_tabSelector);
+        colors.add(Theme.key_chat_emojiSearchIcon);
+        colors.add(Theme.key_chat_emojiSearchBackground);
+        colors.add(Theme.key_windowBackgroundGray);
+    }
 
     private boolean forceChanges;
 
@@ -2668,7 +2698,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                     continue;
                 }
                 EntityView entity = (EntityView) v;
-                Point position = entity.getPosition();
+                PointF position = entity.getPosition();
                 boolean drawThisEntity = true;
                 VideoEditedInfo.MediaEntity mediaEntity = new VideoEditedInfo.MediaEntity();
                 ImageReceiver makeVisibleAfterwards = null;
@@ -3820,23 +3850,23 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             imageView = new ImageView(context);
             imageView.setScaleType(ImageView.ScaleType.CENTER);
-            imageView.setColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+            ThemeBind.colorFilter(imageView, Theme.key_actionBarDefaultSubmenuItem, PaintView.this.resourcesProvider, PorterDuff.Mode.SRC_ATOP);
             imagesView.addView(imageView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
             image2View = new ImageView(context);
             image2View.setScaleType(ImageView.ScaleType.CENTER);
-            image2View.setColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+            ThemeBind.colorFilter(image2View, Theme.key_actionBarDefaultSubmenuItem, PaintView.this.resourcesProvider, PorterDuff.Mode.SRC_ATOP);
             image2View.setVisibility(View.GONE);
             imagesView.addView(image2View, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
             textView = new TextView(context);
-            textView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+            ThemeBind.textColor(textView, Theme.key_actionBarDefaultSubmenuItem, PaintView.this.resourcesProvider);
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             addView(textView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.CENTER_VERTICAL, 0, 0, 16, 0));
 
             checkView = new ImageView(context);
             checkView.setImageResource(R.drawable.msg_text_check);
             checkView.setScaleType(ImageView.ScaleType.CENTER);
-            checkView.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_radioBackgroundChecked), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.colorFilter(checkView, Theme.key_radioBackgroundChecked, PaintView.this.resourcesProvider, PorterDuff.Mode.MULTIPLY);
             checkView.setVisibility(View.GONE);
             addView(checkView, LayoutHelper.createLinear(50, LayoutHelper.MATCH_PARENT));
         }
@@ -4031,7 +4061,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             if (!(entityView instanceof MessageEntityView)) {
                 TextView deleteView = new TextView(getContext());
-                deleteView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+                ThemeBind.textColor(deleteView, Theme.key_actionBarDefaultSubmenuItem, resourcesProvider);
                 deleteView.setGravity(Gravity.CENTER_VERTICAL);
                 deleteView.setLines(1);
                 deleteView.setSingleLine();
@@ -4057,7 +4087,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             if (entityView instanceof TextPaintView) {
                 TextView editView = new TextView(getContext());
-                editView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+                ThemeBind.textColor(editView, Theme.key_actionBarDefaultSubmenuItem, resourcesProvider);
                 editView.setGravity(Gravity.CENTER_VERTICAL);
                 editView.setLines(1);
                 editView.setSingleLine();
@@ -4164,7 +4194,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             if (entitiesView.indexOfChild(entityView) != entitiesView.getChildCount() - 1 && !(entityView instanceof ReactionWidgetEntityView)) {
                 TextView bringToFrontView = new TextView(getContext());
-                bringToFrontView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+                ThemeBind.textColor(bringToFrontView, Theme.key_actionBarDefaultSubmenuItem, resourcesProvider);
                 bringToFrontView.setLines(1);
                 bringToFrontView.setSingleLine();
                 bringToFrontView.setEllipsize(TextUtils.TruncateAt.END);
@@ -4183,7 +4213,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                 parent.addView(bringToFrontView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 44));
             } else if (!(entityView instanceof PhotoView) && !(entityView instanceof MessageEntityView) && !(entityView instanceof RoundView) && !(entityView instanceof LocationView) && !(entityView instanceof WeatherView) && !(entityView instanceof LinkView) && !(entityView instanceof ReactionWidgetEntityView)) {
                 TextView duplicateView = new TextView(getContext());
-                duplicateView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+                ThemeBind.textColor(duplicateView, Theme.key_actionBarDefaultSubmenuItem, resourcesProvider);
                 duplicateView.setLines(1);
                 duplicateView.setSingleLine();
                 duplicateView.setEllipsize(TextUtils.TruncateAt.END);
@@ -4205,12 +4235,12 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             for (int i = 0; i < parent.getChildCount(); ++i) {
                 View child = parent.getChildAt(i);
-                child.setBackground(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector),
+                ThemeBind.selectorBackground(child, Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector),
                     i == 0 ? 8 : 0,
                     i == parent.getChildCount() - 1 ? 8 : 0,
                     i == parent.getChildCount() - 1 ? 8 : 0,
                     i == 0 ? 8 : 0
-                ));
+                ), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
             }
 
             popupLayout.addView(parent);
@@ -4224,7 +4254,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
     private TextView createActionLayoutButton(int tag, String title) {
         TextView textView = new TextView(getContext());
-        textView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubmenuItem));
+        ThemeBind.textColor(textView, Theme.key_actionBarDefaultSubmenuItem, resourcesProvider);
         textView.setGravity(Gravity.CENTER_VERTICAL);
         textView.setLines(1);
         textView.setSingleLine();
@@ -4243,7 +4273,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         }
 
         EntityView entityView = null;
-        Point position = startPositionRelativeToEntity(thisEntityView);
+        PointF position = startPositionRelativeToEntity(thisEntityView);
 
         if (thisEntityView instanceof StickerView) {
             StickerView newStickerView = new StickerView(getContext(), (StickerView) thisEntityView, position);
@@ -4267,22 +4297,24 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         appearAnimation(entityView);
     }
 
-    private Point startPositionRelativeToEntity(EntityView entityView) {
+    private PointF startPositionRelativeToEntity(EntityView entityView) {
         float offset = 200.0f;
         if (currentCropState != null) {
             offset /= currentCropState.cropScale;
         }
 
         if (entityView != null) {
-            Point position = entityView.getPosition();
+            PointF position = entityView.getPosition();
             offset = Math.min(entityView.getHeight(), entityView.getWidth()) * .2f;
-            return new Point(position.x + offset, position.y + offset);
+            float x = position.x + offset;
+            float y = position.y + offset;
+            return new PointF(x, y);
         } else {
             float minimalDistance = 100.0f;
             if (currentCropState != null) {
                 minimalDistance /= currentCropState.cropScale;
             }
-            Point position = centerPositionForEntity();
+            PointF position = centerPositionForEntity();
             for (int i = 0; i < 10; ++i) {
                 boolean occupied = false;
                 for (int index = 0; index < entitiesView.getChildCount(); index++) {
@@ -4290,7 +4322,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                     if (!(view instanceof EntityView) || view instanceof MessageEntityView)
                         continue;
 
-                    Point location = ((EntityView) view).getPosition();
+                    PointF location = ((EntityView) view).getPosition();
                     float distance = (float) Math.sqrt(Math.pow(location.x - position.x, 2) + Math.pow(location.y - position.y, 2));
                     if (distance < minimalDistance) {
                         offset = Math.min(view.getHeight(), view.getWidth()) * .2f;
@@ -4301,7 +4333,9 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                 if (!occupied) {
                     break;
                 } else {
-                    position = new Point(position.x + offset, position.y + offset);
+                    float x = position.x + offset;
+                    float y = position.y + offset;
+                    position = new PointF(x, y);
                 }
             }
             return position;
@@ -4483,13 +4517,15 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         }).start();
     }
 
-    private Point centerPositionForEntity() {
+    private PointF centerPositionForEntity() {
         int w = entitiesView.getMeasuredWidth(), h = entitiesView.getMeasuredHeight();
         if (w <= 0) w = this.w;
         if (h <= 0) h = this.h;
         float x = w / 2.0f;
         float y = h / 2.0f;
-        return new Point(x, y);
+        float x1 = x;
+        float y1 = y;
+        return new PointF(x1, y1);
     }
 
     private PaintView.StickerPosition calculateStickerPosition(TLRPC.Document document) {
@@ -4523,7 +4559,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                 return defaultPosition;
             }
 
-            Point referencePoint = face.getPointForAnchor(anchor);
+            PointF referencePoint = face.getPointForAnchor(anchor);
             float referenceWidth = face.getWidthForAnchor(anchor);
             float angle = face.getAngle();
             Size baseSize = baseStickerSize();
@@ -4540,7 +4576,9 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
             float x = referencePoint.x;
             float y = referencePoint.y;
 
-            return new PaintView.StickerPosition(new Point(x, y), scale, angle);
+            float x1 = x;
+            float y1 = y;
+            return new PaintView.StickerPosition(new PointF(x1, y1), scale, angle);
         }
     }
 
@@ -4565,7 +4603,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     }
 
     private boolean isFaceAnchorOccupied(PhotoFace face, int anchor, long documentId, TLRPC.TL_maskCoords maskCoords) {
-        Point anchorPoint = face.getPointForAnchor(anchor);
+        PointF anchorPoint = face.getPointForAnchor(anchor);
         if (anchorPoint == null) {
             return true;
         }
@@ -4583,7 +4621,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                 continue;
             }
 
-            Point location = stickerView.getPosition();
+            PointF location = stickerView.getPosition();
             float distance = (float)Math.hypot(location.x - anchorPoint.x, location.y - anchorPoint.y);
             if ((documentId == stickerView.getSticker().id || faces.size() > 1) && distance < minDistance) {
                 return true;
@@ -4666,7 +4704,9 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         Size size = new Size(side, side);
         float x = w - size.width / 2f - dp(16);
         float y = dp(72) + size.height / 2f;
-        RoundView view = new RoundView(getContext(), new Point(x, y), 0, 1f, size, thumbPath);
+        float x1 = x;
+        float y1 = y;
+        RoundView view = new RoundView(getContext(), new PointF(x1, y1), 0, 1f, size, thumbPath);
         view.setDelegate(this);
         entitiesView.addView(view);
         checkEntitiesIsVideo();
@@ -4753,7 +4793,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
     private ReactionWidgetEntityView createReactionWidget(boolean select) {
         Size size = new Size(dp(106), dp(106));
-        Point position = centerPositionForEntity();
+        PointF position = centerPositionForEntity();
         boolean goodPosition;
         //compute best position
         if (entitiesView.getMeasuredHeight() > 0) {
@@ -4961,11 +5001,11 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     }
 
     private static class StickerPosition {
-        private Point position;
+        private PointF position;
         private float scale;
         private float angle;
 
-        StickerPosition(Point position, float scale, float angle) {
+        StickerPosition(PointF position, float scale, float angle) {
             this.position = position;
             this.scale = scale;
             this.angle = angle;

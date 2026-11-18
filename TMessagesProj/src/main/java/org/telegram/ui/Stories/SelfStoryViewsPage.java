@@ -30,8 +30,6 @@ import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.exoplayer2.util.Consumer;
-
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ContactsController;
@@ -45,6 +43,7 @@ import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
+import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stories;
@@ -54,6 +53,7 @@ import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AdjustPanLayoutHelper;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Cells.FixedHeightEmptyCell;
 import org.telegram.ui.Cells.ReactedUserHolderView;
 import org.telegram.ui.ChatActivity;
@@ -89,7 +89,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Objects;
 
-public class SelfStoryViewsPage extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
+public class SelfStoryViewsPage extends FrameLayout implements Theme.Colorable, NotificationCenter.NotificationCenterDelegate {
 
     private final View shadowView;
     private final View shadowView2;
@@ -124,12 +124,14 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
     SelfStoryViewsView.StoryItemInternal storyItem;
     ViewsModel currentModel;
     ViewsModel defaultModel;
+    private StoriesController.StoryRepostsList currentRepostsList;
+    private int repostsListConsumedCount;
     private boolean isAttachedToWindow;
     RecyclerItemsEnterAnimator recyclerItemsEnterAnimator;
     StoryViewer storyViewer;
     SearchField searchField;
     final FiltersState sharedFilterState;
-    Consumer<SelfStoryViewsPage> onSharedStateChanged;
+    Utilities.Callback<SelfStoryViewsPage> onSharedStateChanged;
     final FiltersState state = new FiltersState();
     HeaderView headerView;
     boolean isSearchDebounce;
@@ -170,7 +172,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
         return true;
     }
 
-    public SelfStoryViewsPage(StoryViewer storyViewer, @NonNull Context context, FiltersState sharedFilterState, Consumer<SelfStoryViewsPage> onSharedStateChanged) {
+    public SelfStoryViewsPage(StoryViewer storyViewer, @NonNull Context context, FiltersState sharedFilterState, Utilities.Callback<SelfStoryViewsPage> onSharedStateChanged) {
         super(context);
         this.sharedFilterState = sharedFilterState;
         //this.sharedFilterState = null;
@@ -182,7 +184,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
         currentAccount = storyViewer.currentAccount;
 
         titleView = new TextView(context);
-        titleView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+        ThemeBind.textColor(titleView, Theme.key_dialogTextBlack, resourcesProvider);
         titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         titleView.setTypeface(AndroidUtilities.bold());
         titleView.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(6), AndroidUtilities.dp(21), AndroidUtilities.dp(8));
@@ -247,7 +249,41 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
             } else if (item.reaction instanceof TL_stories.TL_storyReaction) {
                 storyViewer.presentFragment(ProfileActivity.of(DialogObject.getPeerDialogId(item.reaction.peer_id)));
             } else if (item.reaction instanceof TL_stories.TL_storyReactionPublicRepost) {
-                storyViewer.fragment.createOverlayStoryViewer().open(getContext(), ((TL_stories.TL_storyReactionPublicRepost) item.reaction).story, StoriesListPlaceProvider.of(recyclerListView));
+                ArrayList<TL_stories.StoryItem> repostStories = new ArrayList<>();
+                int clickedIndex = -1;
+                int consumed = 0;
+                if (currentModel != null && currentModel.reactions != null) {
+                    consumed = currentModel.reactions.size();
+                    for (int i = 0; i < currentModel.reactions.size(); i++) {
+                        TL_stories.StoryReaction r = currentModel.reactions.get(i);
+                        if (r instanceof TL_stories.TL_storyReactionPublicRepost) {
+                            TL_stories.TL_storyReactionPublicRepost repost = (TL_stories.TL_storyReactionPublicRepost) r;
+                            TL_stories.StoryItem story = repost.story;
+                            if (story == null) continue;
+                            story.dialogId = DialogObject.getPeerDialogId(repost.peer_id);
+                            if (r == item.reaction) {
+                                clickedIndex = repostStories.size();
+                            }
+                            repostStories.add(story);
+                        }
+                    }
+                }
+                if (clickedIndex >= 0 && repostStories.size() > 1) {
+                    currentRepostsList = new StoriesController.StoryRepostsList(currentAccount, repostStories);
+                    repostsListConsumedCount = consumed;
+                    final ViewsModel modelRef = currentModel;
+                    storyViewer.fragment.createOverlayStoryViewer().open(
+                        getContext(), clickedIndex, currentRepostsList,
+                        StoriesListPlaceProvider.of(recyclerListView).with(forward -> {
+                            if (modelRef != null) {
+                                modelRef.loadNext();
+                            }
+                        })
+                    );
+                } else {
+                    currentRepostsList = null;
+                    storyViewer.fragment.createOverlayStoryViewer().open(getContext(), ((TL_stories.TL_storyReactionPublicRepost) item.reaction).story, StoriesListPlaceProvider.of(recyclerListView));
+                }
             } else if (item.reaction instanceof TL_stories.TL_storyReactionPublicForward || item.view instanceof TL_stories.TL_storyViewPublicForward) {
                 TLRPC.Message message;
                 if (item.reaction instanceof TL_stories.TL_storyReactionPublicForward) {
@@ -404,11 +440,11 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
 
         topViewsContainer = new FrameLayout(getContext());
         shadowView = new View(getContext());
-        shadowView.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{Theme.getColor(Theme.key_dialogBackground, resourcesProvider), Color.TRANSPARENT}));
+        shadowView.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{shadowViewColor = Theme.getColor(Theme.key_dialogBackground, resourcesProvider), Color.TRANSPARENT}));
         topViewsContainer.addView(shadowView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 8, 0, 0, TOP_PADDING - 8, 0, 0));
 
         shadowView2 = new View(getContext());
-        shadowView2.setBackgroundColor(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
+        ThemeBind.backgroundColor(shadowView2, Theme.key_dialogBackground, resourcesProvider);
         topViewsContainer.addView(shadowView2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 10, 0, 0, TOP_PADDING - 17, 0, 0));
 
         topViewsContainer.addView(headerView);
@@ -663,8 +699,8 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
             currentModel.animateDateForUsers.clear();
         }
         listAdapter.updateRows();
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.storiesUpdated);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.storiesBlocklistUpdate);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.storiesUpdated);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.storiesBlocklistUpdate);
         Bulletin.addDelegate(this, new Bulletin.Delegate() {
             @Override
             public int getBottomOffset(int tag) {
@@ -694,7 +730,60 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
             listAdapter.updateRows();
             recyclerItemsEnterAnimator.showItemsAnimated(oldCount - 1);
             checkLoadMore();
+            appendNewRepostsToList(model);
      //   });
+    }
+
+    public boolean scrollToRepostCell(long dialogId, int storyId) {
+        if (listAdapter == null || listAdapter.items == null || layoutManager == null) {
+            return false;
+        }
+        int position = -1;
+        for (int i = 0; i < listAdapter.items.size(); i++) {
+            Item it = listAdapter.items.get(i);
+            if (it == null || !(it.reaction instanceof TL_stories.TL_storyReactionPublicRepost)) continue;
+            TL_stories.TL_storyReactionPublicRepost rp = (TL_stories.TL_storyReactionPublicRepost) it.reaction;
+            if (rp.story != null
+                && DialogObject.getPeerDialogId(rp.peer_id) == dialogId
+                && rp.story.id == storyId) {
+                position = i;
+                break;
+            }
+        }
+        if (position < 0) {
+            return false;
+        }
+        int first = layoutManager.findFirstVisibleItemPosition();
+        int last = layoutManager.findLastVisibleItemPosition();
+        if (position >= first && position <= last) {
+            return false;
+        }
+        layoutManager.scrollToPositionWithOffset(position, AndroidUtilities.dp(60));
+        return true;
+    }
+
+    private void appendNewRepostsToList(ViewsModel model) {
+        if (currentRepostsList == null || model == null || model != currentModel || model.reactions == null) {
+            return;
+        }
+        if (repostsListConsumedCount >= model.reactions.size()) {
+            return;
+        }
+        ArrayList<TL_stories.StoryItem> newStories = new ArrayList<>();
+        for (int i = repostsListConsumedCount; i < model.reactions.size(); i++) {
+            TL_stories.StoryReaction r = model.reactions.get(i);
+            if (r instanceof TL_stories.TL_storyReactionPublicRepost) {
+                TL_stories.TL_storyReactionPublicRepost repost = (TL_stories.TL_storyReactionPublicRepost) r;
+                TL_stories.StoryItem story = repost.story;
+                if (story == null) continue;
+                story.dialogId = DialogObject.getPeerDialogId(repost.peer_id);
+                newStories.add(story);
+            }
+        }
+        repostsListConsumedCount = model.reactions.size();
+        if (!newStories.isEmpty()) {
+            currentRepostsList.append(newStories);
+        }
     }
 
     public void setListBottomPadding(float bottomPadding) {
@@ -826,8 +915,8 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
                 case SUBSCRIBE_TO_PREMIUM_TEXT_HINT:
                     LinkSpanDrawable.LinksTextView textView = new LinkSpanDrawable.LinksTextView(getContext());
                     textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-                    textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
-                    textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText, resourcesProvider));
+                    ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteGrayText, resourcesProvider);
+                    ThemeBind.linkTextColor(textView, Theme.key_windowBackgroundWhiteLinkText, resourcesProvider);
                     int padding = AndroidUtilities.dp(16);
                     int paddingHorizontal = AndroidUtilities.dp(21);
                     textView.setPadding(paddingHorizontal, padding, paddingHorizontal, padding);
@@ -1443,14 +1532,14 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
 
             allViewersView = new TextView(context);
             allViewersView.setText(LocaleController.getString(R.string.AllViewers));
-            allViewersView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+            ThemeBind.textColor(allViewersView, Theme.key_dialogTextBlack, resourcesProvider);
             allViewersView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             allViewersView.setTypeface(AndroidUtilities.bold());
             allViewersView.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(4), AndroidUtilities.dp(12), AndroidUtilities.dp(4));
 
             contactsViewersView = new TextView(context);
             contactsViewersView.setText(LocaleController.getString(R.string.Contacts));
-            contactsViewersView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+            ThemeBind.textColor(contactsViewersView, Theme.key_dialogTextBlack, resourcesProvider);
             contactsViewersView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             contactsViewersView.setTypeface(AndroidUtilities.bold());
             contactsViewersView.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(4), AndroidUtilities.dp(12), AndroidUtilities.dp(4));
@@ -1461,7 +1550,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
 
             buttonContainer = new LinearLayout(getContext());
             buttonContainer.setPadding(AndroidUtilities.dp(6), 0, AndroidUtilities.dp(6), 0);
-            buttonContainer.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(26), Theme.getColor(Theme.key_listSelector, resourcesProvider)));
+            ThemeBind.fillBackground(buttonContainer, Theme.createRoundRectDrawable(AndroidUtilities.dp(26), Theme.getColor(Theme.key_listSelector, resourcesProvider)), ThemeBind.of(Theme.key_listSelector), resourcesProvider);
             buttonContainer.setOrientation(LinearLayout.HORIZONTAL);
             replacableDrawable = new ReplaceableIconDrawable(getContext());
             replacableDrawable.exactlyBounds = true;
@@ -1515,7 +1604,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
                                 }
                                 updateViewState(true);
                                 reload();
-                                onSharedStateChanged.accept(SelfStoryViewsPage.this);
+                                onSharedStateChanged.run(SelfStoryViewsPage.this);
                             }
                             if (popupMenu != null) {
                                 popupMenu.dismiss();
@@ -1535,7 +1624,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
                                 }
                                 updateViewState(true);
                                 reload();
-                                onSharedStateChanged.accept(SelfStoryViewsPage.this);
+                                onSharedStateChanged.run(SelfStoryViewsPage.this);
                             }
                             if (popupMenu != null) {
                                 popupMenu.dismiss();
@@ -1685,6 +1774,22 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
         public void updateClip(int[] clip) {
             clip[0] = AndroidUtilities.dp(TOP_PADDING);
             clip[1] = getMeasuredHeight();
+        }
+    }
+
+    private int shadowViewColor;
+
+    @Override
+    public void updateColors() {
+        try {
+            final int shadowColor = Theme.getColor(Theme.key_dialogBackground, resourcesProvider);
+            if (shadowView != null && shadowColor != shadowViewColor) {
+                shadowViewColor = shadowColor;
+                shadowView.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{shadowColor, Color.TRANSPARENT}));
+                invalidate();
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
         }
     }
 }

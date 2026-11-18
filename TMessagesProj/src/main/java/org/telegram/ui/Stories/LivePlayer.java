@@ -3,7 +3,6 @@ package org.telegram.ui.Stories;
 import static org.telegram.messenger.MessagesController.findUpdates;
 import static org.telegram.messenger.MessagesController.findUpdatesAndRemove;
 import static org.telegram.messenger.voip.VoIPService.QUALITY_FULL;
-import static org.telegram.messenger.voip.VoIPService.QUALITY_MEDIUM;
 
 import android.Manifest;
 import android.content.Context;
@@ -11,11 +10,8 @@ import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.os.Build;
 
-import androidx.core.math.MathUtils;
-
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.FileLog;
@@ -26,7 +22,6 @@ import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.utils.tlutils.TlUtils;
-import org.telegram.messenger.voip.GroupCallMessagesController;
 import org.telegram.messenger.voip.Instance;
 import org.telegram.messenger.voip.NativeInstance;
 import org.telegram.messenger.voip.VoIPService;
@@ -37,14 +32,13 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.Vector;
 import org.telegram.tgnet.tl.TL_phone;
 import org.telegram.tgnet.tl.TL_stories;
+import org.telegram.tgnet.tl.TL_update;
 import org.telegram.ui.Components.PermissionRequest;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.webrtc.VideoFrame;
 import org.webrtc.VideoSink;
 import org.webrtc.voiceengine.WebRtcAudioTrack;
 
-import java.io.File;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -253,18 +247,18 @@ public class LivePlayer implements NotificationCenter.NotificationCenterDelegate
                             final TLRPC.Updates updates = (TLRPC.Updates) res;
                             MessagesController.getInstance(currentAccount).putUsers(updates.users, false);
                             MessagesController.getInstance(currentAccount).putChats(updates.chats, false);
-                            for (TLRPC.TL_updateGroupCall upd : findUpdates(updates, TLRPC.TL_updateGroupCall.class)) {
+                            for (TL_update.TL_updateGroupCall upd : findUpdates(updates, TL_update.TL_updateGroupCall.class)) {
                                 this.call = upd.call;
                             }
-                            final ArrayList<TLRPC.TL_updateGroupCallMessage> history = findUpdatesAndRemove(updates, TLRPC.TL_updateGroupCallMessage.class);
+                            final ArrayList<TL_update.TL_updateGroupCallMessage> history = findUpdatesAndRemove(updates, TL_update.TL_updateGroupCallMessage.class);
                             AndroidUtilities.runOnUIThread(() -> {
-                                for (TLRPC.TL_updateGroupCallMessage u : history) {
+                                for (TL_update.TL_updateGroupCallMessage u : history) {
                                     NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.liveStoryMessageUpdate, u.call.id, u, true);
                                 }
                             });
                             MessagesController.getInstance(currentAccount).processUpdates(updates, false);
                             final boolean isRtmpStream = call != null && call.rtmp_stream;
-                            for (TLRPC.TL_updateGroupCallParticipants upd : findUpdates(updates, TLRPC.TL_updateGroupCallParticipants.class)) {
+                            for (TL_update.TL_updateGroupCallParticipants upd : findUpdates(updates, TL_update.TL_updateGroupCallParticipants.class)) {
                                 if (upd.call.id == getCallId() && !isRtmpStream) {
                                     for (int i = 0; i < upd.participants.size(); ++i) {
                                         if (DialogObject.getPeerDialogId(upd.participants.get(i).peer) == dialogId) {
@@ -277,7 +271,7 @@ public class LivePlayer implements NotificationCenter.NotificationCenterDelegate
                                 }
                             }
                             TLRPC.TL_dataJSON params = null;
-                            for (TLRPC.TL_updateGroupCallConnection upd : findUpdates(updates, TLRPC.TL_updateGroupCallConnection.class)) {
+                            for (TL_update.TL_updateGroupCallConnection upd : findUpdates(updates, TL_update.TL_updateGroupCallConnection.class)) {
                                 params = upd.params;
                             }
 
@@ -288,9 +282,10 @@ public class LivePlayer implements NotificationCenter.NotificationCenterDelegate
                             if (destroyed || instance == null) {
                                 final TL_phone.leaveGroupCall leaveReq = new TL_phone.leaveGroupCall();
                                 leaveReq.call = inputCall;
+                                leaveReq.source = ssrc;
                                 ConnectionsManager.getInstance(currentAccount).sendRequest(leaveReq, (res2, err2) -> {
                                     if (res2 instanceof TLRPC.Updates) {
-                                        MessagesController.getInstance(currentAccount).processUpdates((TLRPC.Updates) res, false);
+                                        MessagesController.getInstance(currentAccount).processUpdates((TLRPC.Updates) res2, false);
                                     }
                                 });
                                 return;
@@ -604,8 +599,8 @@ public class LivePlayer implements NotificationCenter.NotificationCenterDelegate
     private float volume = 1.0f;
     public void setVolume(float volume) {
         volume = Utilities.clamp01(volume);
-        if (LiveStoryPipOverlay.isVisible(this))
-            volume = 1.0f;
+        if (LiveStoryPipContent.isInPip(this))
+            volume = LiveStoryPipContent.getPipVolume();
         FileLog.d("setVolume(" + volume + ")");
         if (Math.abs(volume - this.volume) < 0.01f) return;
         this.volume = volume;
@@ -678,6 +673,7 @@ public class LivePlayer implements NotificationCenter.NotificationCenterDelegate
         if (joined) {
             final TL_phone.leaveGroupCall req = new TL_phone.leaveGroupCall();
             req.call = inputCall;
+            req.source = mySource;
             ConnectionsManager.getInstance(currentAccount).sendRequest(req, (res, err) -> {
                 if (res instanceof TLRPC.Updates) {
                     MessagesController.getInstance(currentAccount).processUpdates((TLRPC.Updates) res, false);
