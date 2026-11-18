@@ -15,12 +15,15 @@ import org.telegram.ui.ActionBar.Theme;
 
 public class LoadingSpan extends ReplacementSpan {
 
-    private int size;
+    public int size;
     private View view;
     private LoadingDrawable drawable;
 
     public int yOffset;
     private float scaleY = 1f;
+    public float height = -1;
+    public float alpha = 1.0f;
+    public boolean fullWidth = false;
 
     public LoadingSpan(View view, int size) {
         this(view, size, dp(2));
@@ -38,6 +41,25 @@ public class LoadingSpan extends ReplacementSpan {
         this.drawable.setRadiiDp(4);
     }
 
+    public LoadingSpan setHeight(float height) {
+        this.height = height;
+        return this;
+    }
+    public LoadingSpan setAlpha(float alpha) {
+        this.alpha = alpha;
+        return this;
+    }
+    public LoadingSpan setFullWidth(boolean fullWidth) {
+        this.fullWidth = fullWidth;
+        return this;
+    }
+
+    private boolean colorsFromPaint;
+    private void setColorsFromPaint(Paint paint) {
+        final int color = paint.getColor();
+        drawable.setColors(Theme.multAlpha(color, .1f), Theme.multAlpha(color, .25f));
+    }
+
     public void setColorKeys(int colorKey1, int colorKey2) {
         this.drawable.colorKey1 = colorKey1;
         this.drawable.colorKey2 = colorKey2;
@@ -50,6 +72,7 @@ public class LoadingSpan extends ReplacementSpan {
     }
 
     public void setColors(int color1, int color2) {
+        this.colorsFromPaint = false;
         this.drawable.color1 = color1;
         this.drawable.color2 = color2;
     }
@@ -62,7 +85,6 @@ public class LoadingSpan extends ReplacementSpan {
         this.view = view;
     }
 
-    private Paint paint;
     @Override
     public int getSize(@NonNull Paint paint, CharSequence charSequence, int i, int i1, @Nullable Paint.FontMetricsInt fm) {
         final Paint.FontMetrics paintFontMetrics = paint.getFontMetrics();
@@ -73,27 +95,38 @@ public class LoadingSpan extends ReplacementSpan {
             fm.leading = (int) paintFontMetrics.leading;
             fm.top = (int) paintFontMetrics.top;
         }
-        this.paint = paint;
-        if (paint != null && this.drawable.color1 == null && this.drawable.color2 == null) {
-            drawable.setColors(
-                Theme.multAlpha(paint.getColor(), .1f),
-                Theme.multAlpha(paint.getColor(), .25f)
-            );
+        if (paint != null && (colorsFromPaint || this.drawable.color1 == null && this.drawable.color2 == null)) {
+            colorsFromPaint = true;
+            setColorsFromPaint(paint);
+        }
+        if (fullWidth && view != null && view.getMeasuredWidth() > 0) {
+            return view.getMeasuredWidth() - view.getPaddingLeft() - view.getPaddingRight() - size;
         }
         return size;
     }
 
     @Override
     public void draw(@NonNull Canvas canvas, CharSequence charSequence, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint) {
-        drawable.setBounds(
-            (int) x,
-            (int) (top + (bottom - dp(2) - top) / 2f * (1f - scaleY) + yOffset),
-            (int) x + size,
-            (int) (bottom - dp(2) - ((bottom - dp(2)) - top) / 2f * (1f - scaleY) + yOffset)
-        );
-        if (paint != null) {
-            drawable.setAlpha(paint.getAlpha());
+        int size = this.size;
+        if (fullWidth && view != null && view.getMeasuredWidth() > 0) {
+            size = view.getMeasuredWidth() - view.getPaddingLeft() - view.getPaddingRight() - this.size;
         }
+        if (height > 0) {
+            final float cy = (top + bottom) / 2f;
+            drawable.setBounds((int) x, (int) (cy - height / 2f), (int) x + size, (int) (cy + height / 2f));
+        } else {
+            drawable.setBounds(
+                (int) x,
+                (int) (top + (bottom - dp(2) - top) / 2f * (1f - scaleY) + yOffset),
+                (int) x + size,
+                (int) (bottom - dp(2) - ((bottom - dp(2)) - top) / 2f * (1f - scaleY) + yOffset)
+            );
+        }
+        if (colorsFromPaint && paint != null) {
+            // TextView sets its paint color only in onDraw, so the color seen in getSize (during measure) may be stale
+            setColorsFromPaint(paint);
+        }
+        drawable.setAlpha((int) ((paint == null ? 0xFF : paint.getAlpha()) * alpha));
         drawable.draw(canvas);
         if (view != null) {
             view.invalidate();

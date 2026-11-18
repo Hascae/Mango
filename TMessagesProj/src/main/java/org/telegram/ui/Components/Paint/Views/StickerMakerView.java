@@ -1251,12 +1251,12 @@ public class StickerMakerView extends FrameLayout implements NotificationCenter.
             currentAccount = account;
 
             if (currentAccount >= 0 && isAttachedToWindow()) {
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploaded);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadProgressChanged);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadFailed);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingFailed);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingStarted);
-                NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileNewChunkAvailable);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploaded);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadProgressChanged);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadFailed);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingFailed);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingStarted);
+                NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileNewChunkAvailable);
             }
         }
     }
@@ -1278,12 +1278,12 @@ public class StickerMakerView extends FrameLayout implements NotificationCenter.
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
 
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploaded);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadProgressChanged);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadFailed);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingFailed);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.filePreparingStarted);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileNewChunkAvailable);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadProgressChanged);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileUploadFailed);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingFailed);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.filePreparingStarted);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileNewChunkAvailable);
     }
 
     @Override
@@ -1371,7 +1371,7 @@ public class StickerMakerView extends FrameLayout implements NotificationCenter.
                 stickerUploader.mediaDocument.flags |= 1;
                 stickerUploader.mediaDocument.document = uploadedSticker;
                 afterUploadingMedia();
-            } if (videoEditedInfo != null) {
+            } else if (videoEditedInfo != null) {
                 TLRPC.TL_message message = new TLRPC.TL_message();
                 message.id = 1;
                 stickerUploader.finalPath = message.attachPath = StoryEntry.makeCacheFile(UserConfig.selectedAccount, "webm").getAbsolutePath();
@@ -1543,7 +1543,7 @@ public class StickerMakerView extends FrameLayout implements NotificationCenter.
                 stickerUploader.sendToDialogId,
                 null, null, null, null, null,
                 true, 0, 0, false,
-                null, null, 0, 0, 0,
+                null, null, 0, 0,
                 null
             );
             if (loadingToast != null) {

@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">Proxy\'yi bağla</string>
     <string name="LocalHoldVerificationTitle">Yerel Muhafaza kimlik doğrulaması</string>
     <string name="LocalHoldVerificationInfo">Bu hesap, Üçüncü taraf Muhafaza kimlik doğrulamasını geçti.</string>
-    <string name="FeedbackSupportChannel">Sorun geri bildirimi müşteri hizmetleri kanalı</string>
-    <string name="ContactSoftwareDeveloper">Yazılım geliştiricisiyle iletişime geçin</string>
     <string name="ExtensionFeatures">Genişletme merkezi</string>
     <string name="ExtensionFeaturesInfo">Sağ üst köşedeki üç noktadaki kısayol anahtarları hala korunur ve burada birleşik bir ayar girişi sağlanır.</string>
     <string name="DeviceInfoTitle">Cihaz bilgileri</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">Önbellek dosyası silindi</string>
     <string name="CachedFileDeleteFailed">Silinebilecek bir önbellek dosyası bulunamadı</string>
     <string name="SaveStickerToGallery">İfadeleri fotoğraf albümüne kaydet</string>
-    <string name="AccountCancellationBot">Hesabı iptal et</string>
     <string name="UnlimitedChannelJoinTitle">Kanal ekleme üst sınırını aşma</string>
     <string name="UnlimitedChannelJoinInfo">varsayılan olarak etkindir. İstemci, yerel birleştirme kanalı sınırı istemini azaltacaktır ancak Telegram sunucusunun döndürdüğü gerçek sınır hâlâ geçerli olabilir.</string>
     <string name="UnlimitedDialogFiltersTitle">Gruplandırma sınırını aşar</string>

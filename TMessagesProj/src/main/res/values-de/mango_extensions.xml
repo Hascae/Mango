@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">Proxy verbinden</string>
     <string name="LocalHoldVerificationTitle">Local Hold-Zertifizierung</string>
     <string name="LocalHoldVerificationInfo">Dieses Konto hat die Überprüfung durch Dritte bestanden.</string>
-    <string name="FeedbackSupportChannel">Problem-Feedback-Kundendienstkanal</string>
-    <string name="ContactSoftwareDeveloper">Kontaktieren Sie den Softwareentwickler</string>
     <string name="ExtensionFeatures">Erweiterungszentrum</string>
     <string name="ExtensionFeaturesInfo">Die Shortcut-Schalter in den drei Punkten in der oberen rechten Ecke bleiben weiterhin erhalten und es steht hier ein einheitlicher Einstellungseingang zur Verfügung.</string>
     <string name="DeviceInfoTitle">Geräteinformationen</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">Die Cache-Datei wurde gelöscht.</string>
     <string name="CachedFileDeleteFailed">Es wurde keine Cache-Datei gefunden, die gelöscht werden kann</string>
     <string name="SaveStickerToGallery">Speichern Sie Emoticons im Fotoalbum</string>
-    <string name="AccountCancellationBot">Konto kündigen</string>
     <string name="UnlimitedChannelJoinTitle">Obergrenze für das Hinzufügen von Kanälen durchbrechen</string>
     <string name="UnlimitedChannelJoinInfo">ist standardmäßig aktiviert. Der Client reduziert die Eingabeaufforderung zur Beschränkung des lokalen Beitrittskanals, die tatsächliche, vom Telegram-Server zurückgegebene Beschränkung ist jedoch möglicherweise weiterhin wirksam.</string>
     <string name="UnlimitedDialogFiltersTitle">Durchbricht das Gruppierungslimit.</string>
