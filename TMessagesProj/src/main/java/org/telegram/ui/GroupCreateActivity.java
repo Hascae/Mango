@@ -11,8 +11,6 @@ package org.telegram.ui;
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
@@ -30,17 +28,16 @@ import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.LongSparseArray;
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -66,6 +63,7 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Adapters.SearchAdapterHelper;
 import org.telegram.ui.Cells.CheckBoxCell;
@@ -73,6 +71,7 @@ import org.telegram.ui.Cells.GraySectionCell;
 import org.telegram.ui.Cells.GroupCreateSectionCell;
 import org.telegram.ui.Cells.GroupCreateUserCell;
 import org.telegram.ui.Cells.TextCell;
+import org.telegram.ui.Components.ForegroundColorSpanThemable;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ColoredImageSpan;
@@ -80,6 +79,7 @@ import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.FlickerLoadingView;
 import org.telegram.ui.Components.FragmentFloatingButton;
 import org.telegram.ui.Components.FragmentSearchField;
+import org.telegram.ui.Components.FragmentSpansContainer;
 import org.telegram.ui.Components.GroupCreateSpan;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.PermanentLinkBottomSheet;
@@ -89,7 +89,7 @@ import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor;
 import org.telegram.ui.Components.blur3.ViewGroupPartRenderer;
 import org.telegram.ui.Components.blur3.capture.IBlur3Capture;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.inset.WindowAnimatedInsetsProvider;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
@@ -115,8 +115,8 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     private HeaderShadowView headerShadowView;
     private FragmentSearchField searchField;
 
-    private ScrollView scrollView;
-    private SpansContainer spansContainer;
+    private FragmentSpansContainer spansContainer;
+
     private RecyclerListView listView;
     private LinearLayoutManager layoutManager;
     private StickerEmptyView emptyView;
@@ -125,7 +125,6 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     private ContactsAddActivityDelegate delegate2;
     private FragmentFloatingButton floatingButton;
     private boolean doneButtonVisible;
-    private boolean ignoreScrollEvent;
     private FrameLayout buttonsContainer;
 
     private final long chatId;
@@ -149,15 +148,13 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     private final boolean allowMiniApps;
     private GroupCreateSpan selectedPremium;
     private GroupCreateSpan selectedMiniApps;
-    private final LongSparseArray<GroupCreateSpan> selectedContacts = new LongSparseArray<>();
-    private final ArrayList<GroupCreateSpan> allSpans = new ArrayList<>();
+    private LongSparseArray<GroupCreateSpan> selectedContacts = new LongSparseArray<>();
+    private ArrayList<GroupCreateSpan> allSpans = new ArrayList<>();
     private GroupCreateSpan currentDeletingSpan;
 
     public void setTitle(String title) {
         this.customTitle = title;
     }
-
-    private int fieldY;
 
     int maxSize;
 
@@ -230,243 +227,6 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         AndroidUtilities.updateVisibleRows(listView);
     }
 
-    private class SpansContainer extends ViewGroup {
-
-        private AnimatorSet currentAnimation;
-        private boolean animationStarted;
-        private final ArrayList<Animator> animators = new ArrayList<>();
-        private View addingSpan;
-        private final ArrayList<View> removingSpans = new ArrayList<>();
-        private int animationIndex = -1;
-        private int containerHeight;
-
-        public SpansContainer(Context context) {
-            super(context);
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            int count = getChildCount();
-            int width = MeasureSpec.getSize(widthMeasureSpec);
-            int maxWidth = width - dp(26);
-            int currentLineWidth = 0;
-            int y = dp(10);
-            int allCurrentLineWidth = 0;
-            int allY = dp(10);
-            int maxTy = 0;
-            int x;
-            for (int a = 0; a < count; a++) {
-                View child = getChildAt(a);
-                if (!(child instanceof GroupCreateSpan)) {
-                    continue;
-                }
-                child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(32), MeasureSpec.EXACTLY));
-                boolean isRemoving = removingSpans.contains(child);
-                if (!isRemoving && currentLineWidth + child.getMeasuredWidth() > maxWidth) {
-                    y += child.getMeasuredHeight() + dp(8);
-                    currentLineWidth = 0;
-                }
-                if (allCurrentLineWidth + child.getMeasuredWidth() > maxWidth) {
-                    allY += child.getMeasuredHeight() + dp(8);
-                    allCurrentLineWidth = 0;
-                }
-                x = dp(13) + currentLineWidth;
-                if (!animationStarted) {
-                    if (isRemoving) {
-                        child.setTranslationX(dp(13) + allCurrentLineWidth);
-                        child.setTranslationY(allY);
-                    } else if (!removingSpans.isEmpty()) {
-                        if (child.getTranslationX() != x) {
-                            animators.add(ObjectAnimator.ofFloat(child, View.TRANSLATION_X, x));
-                        }
-                        if (child.getTranslationY() != y) {
-                            animators.add(ObjectAnimator.ofFloat(child, View.TRANSLATION_Y, y));
-                        }
-                        maxTy = Math.max(maxTy, y);
-                    } else {
-                        child.setTranslationX(x);
-                        child.setTranslationY(y);
-                        maxTy = Math.max(maxTy, y);
-                    }
-                }
-                if (!isRemoving) {
-                    currentLineWidth += child.getMeasuredWidth() + dp(9);
-                }
-                allCurrentLineWidth += child.getMeasuredWidth() + dp(9);
-            }
-            int minWidth;
-            if (AndroidUtilities.isTablet()) {
-                minWidth = dp(530 - 26 - 18 - 57 * 2) / 3;
-            } else {
-                minWidth = (Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) - dp(26 + 18 + 57 * 2)) / 3;
-            }
-            if (maxWidth - currentLineWidth < minWidth) {
-                currentLineWidth = 0;
-                y += dp(32 + 8);
-            }
-            if (maxWidth - allCurrentLineWidth < minWidth) {
-                allY += dp(32 + 8);
-            }
-            if (!animationStarted) {
-                int currentHeight = allY + dp(32 + 10);
-                fieldY = y;
-                if (currentAnimation != null) {
-                    containerHeight = y + dp(32 + 10);
-                    currentAnimation.playTogether(animators);
-                    currentAnimation.addListener(new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            getNotificationCenter().onAnimationFinish(animationIndex);
-                            requestLayout();
-                        }
-                    });
-                    animationIndex = getNotificationCenter().setAnimationInProgress(animationIndex, null);
-                    currentAnimation.start();
-                    animationStarted = true;
-                } else {
-                    containerHeight = currentHeight;
-                }
-            }
-            animatorSelectorContainerHeight.animateTo(Math.min(maxTy > 0 ? maxTy + dp(40) : 0, maxSize));
-            setMeasuredDimension(width, containerHeight);
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-            for (int a = 0, N = getChildCount(); a < N; a++) {
-                final View child = getChildAt(a);
-                child.layout(0, 0, child.getMeasuredWidth(), child.getMeasuredHeight());
-            }
-        }
-
-        public void addSpan(final GroupCreateSpan span) {
-            allSpans.add(span);
-            if (!span.isFlag) {
-                selectedContacts.put(span.getUid(), span);
-            }
-
-            if (currentAnimation != null && currentAnimation.isRunning()) {
-                currentAnimation.setupEndValues();
-                currentAnimation.cancel();
-            }
-            animationStarted = false;
-            currentAnimation = new AnimatorSet();
-            currentAnimation.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animator) {
-                    addingSpan = null;
-                    currentAnimation = null;
-                    animationStarted = false;
-                }
-            });
-            currentAnimation.setDuration(150);
-            addingSpan = span;
-            animators.clear();
-            animators.add(ObjectAnimator.ofFloat(addingSpan, View.SCALE_X, 0.01f, 1.0f));
-            animators.add(ObjectAnimator.ofFloat(addingSpan, View.SCALE_Y, 0.01f, 1.0f));
-            animators.add(ObjectAnimator.ofFloat(addingSpan, View.ALPHA, 0.0f, 1.0f));
-            addView(span);
-
-            updateButtonsVisibility();
-        }
-
-        public void endAnimation() {
-            if (currentAnimation != null && currentAnimation.isRunning()) {
-                currentAnimation.setupEndValues();
-                currentAnimation.cancel();
-            }
-        }
-
-        public void removeSpan(final GroupCreateSpan span) {
-            ignoreScrollEvent = true;
-            if (!span.isFlag) {
-                selectedContacts.remove(span.getUid());
-            }
-            if (span == selectedPremium) {
-                selectedPremium = null;
-            }
-            if (span == selectedMiniApps) {
-                selectedMiniApps = null;
-            }
-            allSpans.remove(span);
-            span.setOnClickListener(null);
-
-            if (currentAnimation != null) {
-                currentAnimation.setupEndValues();
-                currentAnimation.cancel();
-            }
-            animationStarted = false;
-            currentAnimation = new AnimatorSet();
-            currentAnimation.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(Animator animator) {
-                    removeView(span);
-                    removingSpans.clear();
-                    currentAnimation = null;
-                    animationStarted = false;
-                }
-            });
-            currentAnimation.setDuration(150);
-            removingSpans.clear();
-            removingSpans.add(span);
-            animators.clear();
-            animators.add(ObjectAnimator.ofFloat(span, View.SCALE_X, 1.0f, 0.01f));
-            animators.add(ObjectAnimator.ofFloat(span, View.SCALE_Y, 1.0f, 0.01f));
-            animators.add(ObjectAnimator.ofFloat(span, View.ALPHA, 1.0f, 0.0f));
-            requestLayout();
-
-            updateButtonsVisibility();
-        }
-
-        public void removeAllSpans(boolean animated) {
-            ignoreScrollEvent = true;
-
-            ArrayList<GroupCreateSpan> spans = new ArrayList<>(allSpans);
-            allSpans.clear();
-
-            removingSpans.clear();
-            removingSpans.addAll(spans);
-
-            for (int i = 0; i < spans.size(); ++i) {
-                spans.get(i).setOnClickListener(null);
-            }
-
-            endAnimation();
-            if (animated) {
-                animationStarted = false;
-                currentAnimation = new AnimatorSet();
-                currentAnimation.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animator) {
-                        for (int i = 0; i < spans.size(); ++i) {
-                            removeView(spans.get(i));
-                        }
-                        removingSpans.clear();
-                        currentAnimation = null;
-                        animationStarted = false;
-                    }
-                });
-                animators.clear();
-                for (int i = 0; i < spans.size(); ++i) {
-                    GroupCreateSpan span = spans.get(i);
-                    animators.add(ObjectAnimator.ofFloat(span, View.SCALE_X, 1.0f, 0.01f));
-                    animators.add(ObjectAnimator.ofFloat(span, View.SCALE_Y, 1.0f, 0.01f));
-                    animators.add(ObjectAnimator.ofFloat(span, View.ALPHA, 1.0f, 0.0f));
-                }
-            } else {
-                for (int i = 0; i < spans.size(); ++i) {
-                    removeView(spans.get(i));
-                }
-                removingSpans.clear();
-                currentAnimation = null;
-                animationStarted = false;
-            }
-            requestLayout();
-
-            updateButtonsVisibility();
-        }
-    }
-
     public GroupCreateActivity(Bundle args) {
         super(args);
         chatType = args.getInt("chatType", ChatObject.CHAT_TYPE_CHAT);
@@ -490,7 +250,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor();
-            iBlur3SourceGlassFrosted = new BlurredBackgroundSourceRenderNode(null);
+            iBlur3SourceGlassFrosted = new GlassSourceRenderNode(null);
         } else {
             scrollableViewNoiseSuppressor = null;
             iBlur3SourceGlassFrosted = null;
@@ -499,9 +259,9 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
 
     @Override
     public boolean onFragmentCreate() {
-        getNotificationCenter().addObserver(this, NotificationCenter.contactsDidLoad);
-        getNotificationCenter().addObserver(this, NotificationCenter.updateInterfaces);
-        getNotificationCenter().addObserver(this, NotificationCenter.chatDidCreated);
+        getNotificationCenter().addWeakObserver(this, NotificationCenter.contactsDidLoad);
+        getNotificationCenter().addWeakObserver(this, NotificationCenter.updateInterfaces);
+        getNotificationCenter().addWeakObserver(this, NotificationCenter.chatDidCreated);
 
         getUserConfig().loadGlobalTTl();
         return super.onFragmentCreate();
@@ -630,8 +390,8 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
                 ((MarginLayoutParams) emptyView.getLayoutParams()).topMargin = actionBar.getMeasuredHeight() + dp(DialogsActivity.SEARCH_FIELD_HEIGHT);
                 ((MarginLayoutParams) headerShadowView.getLayoutParams()).topMargin = actionBar.getMeasuredHeight();
                 ((MarginLayoutParams) searchField.getLayoutParams()).topMargin = actionBar.getMeasuredHeight();
-                ((MarginLayoutParams) scrollView.getLayoutParams()).topMargin = actionBar.getMeasuredHeight();
-                scrollView.getLayoutParams().height = maxSize;
+                ((MarginLayoutParams) spansContainer.getLayoutParams()).topMargin = actionBar.getMeasuredHeight();
+                spansContainer.getLayoutParams().height = maxSize;
 
                 MarginLayoutParams lp = (MarginLayoutParams) actionBarBackgroundView.getLayoutParams();
                 lp.height = actionBar.getMeasuredHeight() + dp(DialogsActivity.SEARCH_FIELD_HEIGHT + 5) + maxSize;
@@ -654,39 +414,39 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         contentView.setFocusableInTouchMode(true);
         contentView.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
 
-        scrollView = new ScrollView(context) {
+        spansContainer = new FragmentSpansContainer(context, currentAccount) {
             @Override
-            public boolean requestChildRectangleOnScreen(View child, Rect rectangle, boolean immediate) {
-                if (ignoreScrollEvent) {
-                    ignoreScrollEvent = false;
-                    return false;
-                }
-                rectangle.offset(child.getLeft() - child.getScrollX(), child.getTop() - child.getScrollY());
-                rectangle.top += fieldY + dp(20);
-                rectangle.bottom += fieldY + dp(50);
-                return super.requestChildRectangleOnScreen(child, rectangle, immediate);
+            public void addSpan(GroupCreateSpan span) {
+                super.addSpan(span);
+                updateButtonsVisibility();
             }
 
             @Override
-            public boolean dispatchTouchEvent(MotionEvent ev) {
-                final int action = ev.getAction();
-                final float h = animatorSelectorContainerHeight.getFactor();
-                final float y = ev.getY();
-                if (action == MotionEvent.ACTION_DOWN && y > h) {
-                    return false;
+            public void removeSpan(GroupCreateSpan span) {
+                if (span == selectedPremium) {
+                    selectedPremium = null;
                 }
-                return super.dispatchTouchEvent(ev);
+                if (span == selectedMiniApps) {
+                    selectedMiniApps = null;
+                }
+                super.removeSpan(span);
+                updateButtonsVisibility();
+            }
+
+            @Override
+            public void removeAllSpans(boolean animated) {
+                super.removeAllSpans(animated);
+                updateButtonsVisibility();
             }
         };
-        scrollView.setVerticalScrollBarEnabled(false);
-
-        spansContainer = new SpansContainer(context);
-        scrollView.addView(spansContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-        spansContainer.setOnClickListener(v -> {
+        spansContainer.setDelegate(height -> animatorSelectorContainerHeight.animateTo(Math.min(height, maxSize)));
+        spansContainer.getSpansContainer().setOnClickListener(v -> {
             searchField.editText.clearFocus();
             searchField.editText.requestFocus();
             AndroidUtilities.showKeyboard(searchField.editText);
         });
+        selectedContacts = spansContainer.selectedContacts;
+        allSpans = spansContainer.allSpans;
 
         updateEditTextHint();
         searchField.editText.setOnEditorActionListener((v, actionId, event) -> actionId == EditorInfo.IME_ACTION_DONE && onDonePressed(true));
@@ -751,8 +511,6 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         emptyView.showProgress(true, false);
         emptyView.title.setText(getString(R.string.NoResult));
 
-        contentView.addView(emptyView);
-
         layoutManager = new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false);
         listView = new RecyclerListView(context);
         listView.setFastScrollEnabled(RecyclerListView.FastScroll.LETTER_TYPE);
@@ -763,6 +521,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         listView.setClipToPadding(false);
         listView.setVerticalScrollbarPosition(LocaleController.isRTL ? View.SCROLLBAR_POSITION_LEFT : View.SCROLLBAR_POSITION_RIGHT);
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, -ADDITIONAL_LIST_HEIGHT_DP, 0,  -ADDITIONAL_LIST_HEIGHT_DP));
+        contentView.addView(emptyView);
         listView.setOnItemClickListener((view, position) -> {
             if (position == adapter.createCallLinkRow) {
                 CallLogActivity.createCallLink(context, currentAccount, resourceProvider, this::finishFragment);
@@ -937,7 +696,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
                 }
             };
             View buttonShadow = new View(context);
-            buttonShadow.setBackgroundColor(Theme.getColor(Theme.key_divider, resourceProvider));
+            ThemeBind.backgroundColor(buttonShadow, Theme.key_divider, resourceProvider);
             buttonsContainer.addView(buttonShadow, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1f / AndroidUtilities.density, Gravity.TOP | Gravity.FILL_HORIZONTAL, 0, 0, 0, 0));
 
             LinearLayout buttonsLayout = new LinearLayout(context);
@@ -988,7 +747,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         contentView.addView(actionBarBackgroundView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 0, Gravity.TOP));
         contentView.addView(actionBar);
         contentView.addView(searchField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 40, Gravity.TOP, 11, 0, 11, 0));
-        contentView.addView(scrollView);
+        contentView.addView(spansContainer);
 
         iBlur3Capture = new ViewGroupPartRenderer(listView, contentView, listView::drawChild);
         listView.addEdgeEffectListener(() -> listView.postOnAnimation(() -> {
@@ -1711,7 +1470,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
                                         } else {
                                             index++;
                                         }
-                                        spannableStringBuilder.setSpan(new ForegroundColorSpan(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4)), index, index + len, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                                        spannableStringBuilder.setSpan(new ForegroundColorSpanThemable(Theme.key_windowBackgroundWhiteBlueText4), index, index + len, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                                     }
                                     username = spannableStringBuilder;
                                 } catch (Exception e) {
@@ -1935,68 +1694,29 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     public ArrayList<ThemeDescription> getThemeDescriptions() {
         ArrayList<ThemeDescription> themeDescriptions = new ArrayList<>();
 
-        ThemeDescription.ThemeDescriptionDelegate cellDelegate = () -> {
-            if (listView != null) {
-                int count = listView.getChildCount();
-                for (int a = 0; a < count; a++) {
-                    View child = listView.getChildAt(a);
-                    if (child instanceof GroupCreateUserCell) {
-                        ((GroupCreateUserCell) child).update(0);
-                    }
-                }
-            }
-            if (searchField != null) {
-                searchField.updateColors();
-            }
-            if (floatingButton != null) {
-                floatingButton.updateColors();
-            }
-        };
+        ThemeDescription.ThemeDescriptionDelegate cellDelegate = this::cellDelegateThemeColors;
 
-        themeDescriptions.add(new ThemeDescription(fragmentView, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_windowBackgroundWhite));
 
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_actionBarDefault));
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_LISTGLOWCOLOR, null, null, null, null, Theme.key_actionBarDefault));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_ITEMSCOLOR, null, null, null, null, Theme.key_actionBarDefaultIcon));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_TITLECOLOR, null, null, null, null, Theme.key_actionBarDefaultTitle));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_SELECTORCOLOR, null, null, null, null, Theme.key_actionBarDefaultSelector));
 
-        themeDescriptions.add(new ThemeDescription(scrollView, ThemeDescription.FLAG_LISTGLOWCOLOR, null, null, null, null, Theme.key_windowBackgroundWhite));
+        themeDescriptions.add(new ThemeDescription(spansContainer, ThemeDescription.FLAG_LISTGLOWCOLOR, null, null, null, null, Theme.key_windowBackgroundWhite));
 
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_SELECTOR, null, null, null, null, Theme.key_listSelector));
 
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_FASTSCROLL, null, null, null, null, Theme.key_fastScrollActive));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_FASTSCROLL, null, null, null, null, Theme.key_fastScrollInactive));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_FASTSCROLL, null, null, null, null, Theme.key_fastScrollText));
 
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{View.class}, Theme.dividerPaint, null, null, Theme.key_divider));
 
         themeDescriptions.add(new ThemeDescription(emptyView, ThemeDescription.FLAG_TEXTCOLOR, null, null, null, null, Theme.key_emptyListPlaceholder));
         themeDescriptions.add(new ThemeDescription(emptyView, ThemeDescription.FLAG_PROGRESSBAR, null, null, null, null, Theme.key_progressCircle));
 
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_CELLBACKGROUNDCOLOR, new Class[]{GroupCreateSectionCell.class}, null, null, null, Theme.key_graySection));
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{GroupCreateSectionCell.class}, new String[]{"drawable"}, null, null, null, Theme.key_groupcreate_sectionShadow));
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR, new Class[]{GroupCreateSectionCell.class}, new String[]{"textView"}, null, null, null, Theme.key_groupcreate_sectionText));
 
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR, new Class[]{GroupCreateUserCell.class}, new String[]{"textView"}, null, null, null, Theme.key_groupcreate_sectionText));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR, new Class[]{GroupCreateUserCell.class}, new String[]{"checkBox"}, null, null, null, Theme.key_checkbox));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR, new Class[]{GroupCreateUserCell.class}, new String[]{"checkBox"}, null, null, null, Theme.key_checkboxDisabled));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR, new Class[]{GroupCreateUserCell.class}, new String[]{"checkBox"}, null, null, null, Theme.key_checkboxCheck));
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR | ThemeDescription.FLAG_CHECKTAG, new Class[]{GroupCreateUserCell.class}, new String[]{"statusTextView"}, null, null, null, Theme.key_windowBackgroundWhiteBlueText));
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR | ThemeDescription.FLAG_CHECKTAG, new Class[]{GroupCreateUserCell.class}, new String[]{"statusTextView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText));
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{GroupCreateUserCell.class}, null, Theme.avatarDrawables, null, Theme.key_avatar_text));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundRed));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundOrange));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundViolet));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundGreen));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundCyan));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundBlue));
-        themeDescriptions.add(new ThemeDescription(null, 0, null, null, null, cellDelegate, Theme.key_avatar_backgroundPink));
 
-        themeDescriptions.add(new ThemeDescription(spansContainer, 0, new Class[]{GroupCreateSpan.class}, null, null, null, Theme.key_groupcreate_spanBackground));
-        themeDescriptions.add(new ThemeDescription(spansContainer, 0, new Class[]{GroupCreateSpan.class}, null, null, null, Theme.key_groupcreate_spanText));
-        themeDescriptions.add(new ThemeDescription(spansContainer, 0, new Class[]{GroupCreateSpan.class}, null, null, null, Theme.key_groupcreate_spanDelete));
-        themeDescriptions.add(new ThemeDescription(spansContainer, 0, new Class[]{GroupCreateSpan.class}, null, null, null, Theme.key_avatar_backgroundBlue));
+        themeDescriptions.add(new ThemeDescription(spansContainer.getSpansContainer(), 0, new Class[]{GroupCreateSpan.class}, null, null, null, Theme.key_groupcreate_spanBackground));
+        themeDescriptions.add(new ThemeDescription(spansContainer.getSpansContainer(), 0, new Class[]{GroupCreateSpan.class}, null, null, null, Theme.key_groupcreate_spanDelete));
 
         themeDescriptions.add(new ThemeDescription(emptyView.title, ThemeDescription.FLAG_TEXTCOLOR, null, null, null, null, Theme.key_windowBackgroundWhiteBlackText));
         themeDescriptions.add(new ThemeDescription(emptyView.subtitle, ThemeDescription.FLAG_TEXTCOLOR, null, null, null, null, Theme.key_windowBackgroundWhiteGrayText));
@@ -2063,7 +1783,8 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
 
     @NonNull
     private WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat insets) {
-        navigationBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+        final Insets systemInsets = AndroidUtilities.getDefaultWindowInsets(insets, false);
+        navigationBarHeight = systemInsets.bottom;
         if (buttonsContainer != null) {
             buttonsContainer.setPadding(0, 0, 0, navigationBarHeight);
         }
@@ -2132,7 +1853,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     /* Blur */
 
     private final @Nullable DownscaleScrollableNoiseSuppressor scrollableViewNoiseSuppressor;
-    private final @Nullable BlurredBackgroundSourceRenderNode iBlur3SourceGlassFrosted;
+    private final @Nullable GlassSourceRenderNode iBlur3SourceGlassFrosted;
 
     private IBlur3Capture iBlur3Capture;
     private boolean iBlur3Invalidated;
@@ -2162,5 +1883,74 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
 
         scrollableViewNoiseSuppressor.setupRenderNodes(iBlur3Positions, buttonsContainer != null && animatorCallButtonsVisible.getFloatValue() > 0 ? 2 : 1);
         scrollableViewNoiseSuppressor.invalidateResultRenderNodes(iBlur3Capture, fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());
+    }
+
+    @Override
+    public void onThemeColorsChanged() {
+        try {
+            super.onThemeColorsChanged();
+            cellDelegateThemeColors();
+            updateThemeColorsExtra();
+    
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    private void updateThemeColorsExtra() {
+        try {
+            if (listView != null) {
+                listView.updateFastScrollColors();
+                if (listView.getFastScroll() != null) {
+                    listView.getFastScroll().invalidate();
+                }
+            }
+            if (spansContainer != null && spansContainer.getSpansContainer() != null) {
+                final ViewGroup container = spansContainer.getSpansContainer();
+                for (int a = 0; a < container.getChildCount(); a++) {
+                    final View child = container.getChildAt(a);
+                    if (child instanceof GroupCreateSpan) {
+                        child.invalidate();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    private void cellDelegateThemeColors() {
+        if (searchField != null) {
+            searchField.updateColors();
+        }
+        if (floatingButton != null) {
+            floatingButton.updateColors();
+        }
+    }
+
+    /** theme editor: colors this page shows (former ThemeDescription keys) */
+    @Override
+    public void addThemeColorKeys(HashSet<Integer> keys) {
+        super.addThemeColorKeys(keys);
+        keys.add(Theme.key_avatar_backgroundBlue);
+        keys.add(Theme.key_groupcreate_spanText);
+        keys.add(Theme.key_avatar_backgroundPink);
+        keys.add(Theme.key_avatar_backgroundCyan);
+        keys.add(Theme.key_avatar_backgroundGreen);
+        keys.add(Theme.key_avatar_backgroundViolet);
+        keys.add(Theme.key_avatar_backgroundOrange);
+        keys.add(Theme.key_avatar_backgroundRed);
+        keys.add(Theme.key_avatar_text);
+        keys.add(Theme.key_windowBackgroundWhiteGrayText);
+        keys.add(Theme.key_windowBackgroundWhiteBlueText);
+        keys.add(Theme.key_groupcreate_sectionText);
+        keys.add(Theme.key_groupcreate_sectionShadow);
+        keys.add(Theme.key_graySection);
+        keys.add(Theme.key_listSelector);
+        keys.add(Theme.key_actionBarDefaultSelector);
+        keys.add(Theme.key_actionBarDefaultTitle);
+        keys.add(Theme.key_actionBarDefaultIcon);
+        keys.add(Theme.key_actionBarDefault);
+        keys.add(Theme.key_windowBackgroundWhite);
     }
 }

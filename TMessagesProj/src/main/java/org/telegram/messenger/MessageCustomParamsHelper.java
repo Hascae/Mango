@@ -5,11 +5,18 @@ import org.telegram.tgnet.NativeByteBuffer;
 import org.telegram.tgnet.OutputSerializedData;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.tl.TL_iv;
 
 public class MessageCustomParamsHelper {
 
+    private static boolean isCommentEncryptionPreparing(TLRPC.Message message) {
+        return message.action instanceof TLRPC.TL_messageActionGramTransfer
+                && ((TLRPC.TL_messageActionGramTransfer) message.action).comment_encrypted_preparing;
+    }
+
     public static boolean isEmpty(TLRPC.Message message) {
         return (
+            !isCommentEncryptionPreparing(message) &&
             message.voiceTranscription == null &&
             message.translatedVoiceTranscription == null &&
             !message.voiceTranscriptionOpen &&
@@ -26,6 +33,7 @@ public class MessageCustomParamsHelper {
             message.translatedToLanguage == null &&
             message.translatedPoll == null &&
             message.translatedText == null &&
+            message.translatedRichMessage == null &&
             message.errorAllowedPriceStars == 0 &&
             message.errorNewPriceStars == 0 &&
             message.originalText == null &&
@@ -46,6 +54,7 @@ public class MessageCustomParamsHelper {
         toMessage.translatedToLanguage = fromMessage.translatedToLanguage;
         toMessage.translatedPoll = fromMessage.translatedPoll;
         toMessage.translatedText = fromMessage.translatedText;
+        toMessage.translatedRichMessage = fromMessage.translatedRichMessage;
         toMessage.errorAllowedPriceStars = fromMessage.errorAllowedPriceStars;
         toMessage.errorNewPriceStars = fromMessage.errorNewPriceStars;
         toMessage.translatedVoiceTranscription = fromMessage.translatedVoiceTranscription;
@@ -70,6 +79,7 @@ public class MessageCustomParamsHelper {
             case 2:
             case 3:
             case 4:
+            case 5:
                 params = new Params_v2(message, version);
                 break;
             default:
@@ -82,7 +92,7 @@ public class MessageCustomParamsHelper {
         if (isEmpty(message)) {
             return null;
         }
-        TLObject params = new Params_v2(message, 4);
+        TLObject params = new Params_v2(message, Params_v2.VERSION);
         try {
             NativeByteBuffer nativeByteBuffer = new NativeByteBuffer(params.getObjectSize());
             params.serializeToStream(nativeByteBuffer);
@@ -95,7 +105,7 @@ public class MessageCustomParamsHelper {
 
     private static class Params_v2 extends TLObject {
 
-        private final static int VERSION = 4;
+        private final static int VERSION = 5;
         final TLRPC.Message message;
         final int version;
         int flags = 0;
@@ -120,9 +130,13 @@ public class MessageCustomParamsHelper {
             flags = setFlag(flags, FLAG_10, message.summaryText != null);
             flags = setFlag(flags, FLAG_11, message.translatedSummaryText != null);
             flags = setFlag(flags, FLAG_12, message.translatedSummaryLanguage != null);
-            flags = setFlag(flags, FLAG_13, message.originalText != null);
-            flags = setFlag(flags, FLAG_14, message.localEditedText != null);
-            flags = setFlag(flags, FLAG_15, message.localEditedDate != 0);
+
+            flags = setFlag(flags, FLAG_13, message.translatedRichMessage != null);
+            flags = setFlag(flags, FLAG_14, isCommentEncryptionPreparing(message));
+            // This fork's local fields sit high, clear of the flags official adds in order.
+            flags = setFlag(flags, FLAG_28, message.originalText != null);
+            flags = setFlag(flags, FLAG_29, message.localEditedText != null);
+            flags = setFlag(flags, FLAG_30, message.localEditedDate != 0);
         }
 
         @Override
@@ -173,12 +187,15 @@ public class MessageCustomParamsHelper {
                 stream.writeString(message.translatedSummaryLanguage);
             }
             if (hasFlag(flags, FLAG_13)) {
+                message.translatedRichMessage.serializeToStream(stream);
+            }
+            if (hasFlag(flags, FLAG_28)) {
                 message.originalText.serializeToStream(stream);
             }
-            if (hasFlag(flags, FLAG_14)) {
+            if (hasFlag(flags, FLAG_29)) {
                 stream.writeString(message.localEditedText);
             }
-            if (hasFlag(flags, FLAG_15)) {
+            if (hasFlag(flags, FLAG_30)) {
                 stream.writeInt32(message.localEditedDate);
             }
         }
@@ -186,6 +203,11 @@ public class MessageCustomParamsHelper {
         @Override
         public void readParams(InputSerializedData stream, boolean exception) {
             flags = stream.readInt32(true);
+            if (message.action instanceof TLRPC.TL_messageActionGramTransfer) {
+                final TLRPC.TL_messageActionGramTransfer action = (TLRPC.TL_messageActionGramTransfer) message.action;
+                // An update may carry ciphertext while storage still has the old local params.
+                action.comment_encrypted_preparing = !action.comment_encrypted && hasFlag(flags, FLAG_14);
+            }
             if ((flags & 1) != 0) {
                 message.voiceTranscription = stream.readString(exception);
             }
@@ -228,14 +250,30 @@ public class MessageCustomParamsHelper {
             if (hasFlag(flags, FLAG_12)) {
                 message.translatedSummaryLanguage = stream.readString(exception);
             }
-            if (version >= 2 && hasFlag(flags, FLAG_13)) {
-                message.originalText = TLRPC.TL_textWithEntities.TLdeserialize(stream, stream.readInt32(exception), exception);
-            }
-            if (version >= 3 && hasFlag(flags, FLAG_14)) {
-                message.localEditedText = stream.readString(exception);
-            }
-            if (version >= 4 && hasFlag(flags, FLAG_15)) {
-                message.localEditedDate = stream.readInt32(exception);
+            if (version >= 5) {
+                if (hasFlag(flags, FLAG_13)) {
+                    message.translatedRichMessage = TL_iv.RichMessage.TLdeserialize(stream, stream.readInt32(exception), exception);
+                }
+                if (hasFlag(flags, FLAG_28)) {
+                    message.originalText = TLRPC.TL_textWithEntities.TLdeserialize(stream, stream.readInt32(exception), exception);
+                }
+                if (hasFlag(flags, FLAG_29)) {
+                    message.localEditedText = stream.readString(exception);
+                }
+                if (hasFlag(flags, FLAG_30)) {
+                    message.localEditedDate = stream.readInt32(exception);
+                }
+            } else {
+                // Versions 2 to 4 were written by this fork on 12.x, where flags 13 to 15 held its own fields.
+                if (version >= 2 && hasFlag(flags, FLAG_13)) {
+                    message.originalText = TLRPC.TL_textWithEntities.TLdeserialize(stream, stream.readInt32(exception), exception);
+                }
+                if (version >= 3 && hasFlag(flags, FLAG_14)) {
+                    message.localEditedText = stream.readString(exception);
+                }
+                if (version >= 4 && hasFlag(flags, FLAG_15)) {
+                    message.localEditedDate = stream.readInt32(exception);
+                }
             }
         }
 

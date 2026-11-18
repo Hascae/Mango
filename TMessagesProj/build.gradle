@@ -1,4 +1,29 @@
 apply plugin: 'com.android.library'
+apply plugin: 'org.telegram.build-plugin'
+apply plugin: 'idea'
+
+idea {
+    module {
+        excludeDirs += [
+            file('jni/td'),
+            file('jni/third_party/absl'),
+            file('jni/third_party/boringssl'),
+            file('jni/third_party/dav1d'),
+            file('jni/third_party/ffmpeg'),
+            file('jni/third_party/libvpx'),
+            file('jni/third_party/libyuv'),
+            file('jni/third_party/openh264'),
+            file('jni/third_party/xiph'),
+            file('jni/third_party/wamr'),
+            file('jni/third_party/libprisma'),
+            file('jni/third_party/boost-regex'),
+            file('jni/tgcalls'),
+            file('jni/tlottie'),
+            file('jni/voip/webrtc'),
+            file('jni/sqlite')
+        ]
+    }
+}
 
 repositories {
     mavenCentral()
@@ -22,22 +47,21 @@ dependencies {
     implementation 'androidx.interpolator:interpolator:1.0.0'
     implementation 'androidx.biometric:biometric:1.1.0'
     implementation 'androidx.documentfile:documentfile:1.1.0'
+    implementation 'androidx.webkit:webkit:1.14.0'
 
     // 23.x requires a pre-release mediarouter 1.9; this is the newest pair that is all stable.
     implementation 'com.google.android.gms:play-services-cast-framework:22.3.1'
     implementation "androidx.mediarouter:mediarouter:1.8.1"
+    implementation 'com.google.zxing:core:3.5.4'
+    implementation 'com.neovisionaries:nv-websocket-client:2.14'
+
+    implementation 'androidx.car.app:app:1.4.0'
+    implementation 'androidx.car.app:app-projected:1.4.0'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
 
     compileOnly 'org.checkerframework:checker-qual:4.4.0'
     compileOnly 'org.checkerframework:checker-compat-qual:2.5.6'
-    // Guava stopped bringing these in; the bundled ExoPlayer still compiles against them.
-    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
-    implementation platform('com.google.firebase:firebase-bom:35.2.0')
-    implementation 'com.google.firebase:firebase-messaging'
-    implementation 'com.google.firebase:firebase-config'
-    // Not covered by the BoM.
-    implementation 'com.google.firebase:firebase-datatransport:21.0.0'
-    implementation 'com.google.firebase:firebase-appindexing:20.0.0'
+
     implementation 'com.google.android.gms:play-services-maps:20.1.0'
     implementation 'com.google.android.gms:play-services-auth:22.0.0'
     implementation 'com.google.android.gms:play-services-auth-api-phone:18.3.1'
@@ -61,26 +85,49 @@ dependencies {
     implementation "androidx.credentials:credentials-play-services-auth:1.6.0"
     implementation "com.google.android.libraries.identity.googleid:googleid:1.2.1"
 
-//    implementation 'com.google.mlkit:translate:17.0.3'
+    // 34.19.0 is the last BoM for minSdk 23: BoM 35.x requires minSdk 24 (33.16.0 was the last for Android 5).
+    api platform('com.google.firebase:firebase-bom:35.2.0')
+    implementation 'com.google.firebase:firebase-messaging'
+    implementation "com.google.firebase:firebase-pnv"
+    implementation 'com.google.firebase:firebase-appindexing:20.0.0'
+
+    implementation "io.noties.markwon:core:4.6.2"
+    implementation "io.noties.markwon:ext-strikethrough:4.6.2"
+    implementation "io.noties.markwon:ext-tables:4.6.2"
+    implementation "io.noties.markwon:html:4.6.2"
+    implementation "io.noties.markwon:inline-parser:4.6.2"
+    implementation("io.noties.markwon:ext-latex:4.6.2") {
+        exclude group: 'ru.noties', module: 'jlatexmath-android'
+    }
+
+    api project(":TMessagesProj_Modules:media-lib-exoplayer")
+    api project(":TMessagesProj_Modules:media-lib-exoplayer-dash")
+    api project(":TMessagesProj_Modules:media-lib-exoplayer-hls")
+    api project(":TMessagesProj_Modules:media-lib-decoder-ffmpeg")
+    api project(":TMessagesProj_Modules:media-lib-session")
+    api project(':jlatexmath')
 
     implementation 'com.google.android.recaptcha:recaptcha:18.9.4'
 
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
 
-def isWindows = String.valueOf(System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows'))
 android {
     compileSdk = 37
     buildToolsVersion '37.0.0'
     ndkVersion = "30.0.16248370"
 
-    sourceSets.main.jniLibs.srcDirs = ['./jni/']
 
     externalNativeBuild {
         cmake {
             path 'jni/CMakeLists.txt'
             version = '4.1.2'
         }
+    }
+
+    // IWidgetEngine: the widget engine's isolated process (WidgetEngineService).
+    buildFeatures {
+        aidl = true
     }
 
     lint {
@@ -94,7 +141,6 @@ android {
         coreLibraryDesugaringEnabled = true
     }
 
-
     defaultConfig {
         minSdk = 24
         targetSdk = 37
@@ -106,6 +152,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-24' //, '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                targets 'tmessages.49', 'twidget'
             }
         }
     }
@@ -113,18 +160,14 @@ android {
     buildTypes {
         debug {
             jniDebuggable true
-            minifyEnabled false
             shrinkResources = false
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
-            buildConfigField "String", "APP_CENTER_HASH", "\"\""
             buildConfigField "String", "BETA_URL", "\"" + getProps("BETA_PRIVATE_URL") + "\""
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "true"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "0"
         }
 
@@ -132,17 +175,13 @@ android {
             // The skin module has no beta build types; it builds these as release.
             matchingFallbacks = ["release"]
             jniDebuggable false
-            minifyEnabled true
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
-            buildConfigField "String", "APP_CENTER_HASH", "\"" + getProps("APP_CENTER_HASH_PRIVATE") + "\""
             buildConfigField "String", "BETA_URL", "\"" + getProps("BETA_PRIVATE_URL") + "\""
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "true"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "1"
         }
 
@@ -150,17 +189,13 @@ android {
             // The skin module has no beta build types; it builds these as release.
             matchingFallbacks = ["release"]
             jniDebuggable false
-            minifyEnabled true
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
-            buildConfigField "String", "APP_CENTER_HASH", "\"" + getProps("APP_CENTER_HASH_PUBLIC") + "\""
             buildConfigField "String", "BETA_URL", "\"" + getProps("BETA_PUBLIC_URL") + "\""
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "4"
         }
 
@@ -168,50 +203,39 @@ android {
             // The skin module has no beta build types; it builds these as release.
             matchingFallbacks = ["release"]
             jniDebuggable false
-            minifyEnabled true
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
-            buildConfigField "String", "APP_CENTER_HASH", "\"" + getProps("APP_CENTER_HASH_HARDCORE") + "\""
             buildConfigField "String", "BETA_URL", "\"" + getProps("BETA_HARDCORE_URL") + "\""
             buildConfigField "boolean", "DEBUG_VERSION", "true"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "true"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "5"
         }
 
         standalone {
+            matchingFallbacks = ['release']
             jniDebuggable false
-            minifyEnabled true
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
-            buildConfigField "String", "APP_CENTER_HASH", "\"\""
             buildConfigField "String", "BETA_URL", "\"\""
             buildConfigField "boolean", "DEBUG_VERSION", "false"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "6"
         }
 
         release {
             jniDebuggable false
-            minifyEnabled true
             shrinkResources = false
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
             buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
-            buildConfigField "String", "APP_CENTER_HASH", "\"\""
             buildConfigField "String", "BETA_URL", "\"\""
             buildConfigField "boolean", "DEBUG_VERSION", "false"
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
-            buildConfigField "boolean", "BUILD_HOST_IS_WINDOWS", isWindows
             buildConfigField "int", "VERSION_NUM", "7"
         }
     }

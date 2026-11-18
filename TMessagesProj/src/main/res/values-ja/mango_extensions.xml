@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">プロキシを接続する</string>
     <string name="LocalHoldVerificationTitle">ローカル保留認証</string>
     <string name="LocalHoldVerificationInfo">このアカウントは保留サードパーティ認証に合格しました。</string>
-    <string name="FeedbackSupportChannel">問題フィードバック カスタマー サービス チャネル</string>
-    <string name="ContactSoftwareDeveloper">ソフトウェア開発者に問い合わせる</string>
     <string name="ExtensionFeatures">拡張センター</string>
     <string name="ExtensionFeaturesInfo">右上隅の 3 つの点のショートカット スイッチはそのまま残されており、ここに統一された設定入り口が提供されます。</string>
     <string name="DeviceInfoTitle">デバイス情報</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">キャッシュファイルが削除されました</string>
     <string name="CachedFileDeleteFailed">削除できるキャッシュファイルが見つかりません</string>
     <string name="SaveStickerToGallery">絵文字をフォトアルバムに保存する</string>
-    <string name="AccountCancellationBot">アカウントをキャンセルする</string>
     <string name="UnlimitedChannelJoinTitle">チャネル追加の上限を突破します。</string>
     <string name="UnlimitedChannelJoinInfo">はデフォルトで有効です。クライアントはローカル参加チャネル制限プロンプトを減らしますが、Telegram サーバーから返される実際の制限はまだ有効である可能性があります。</string>
     <string name="UnlimitedDialogFiltersTitle">グループ化制限を突破します</string>

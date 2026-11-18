@@ -1,0 +1,74 @@
+name: Compile check
+
+# Compiles the app's Java and Kotlin sources without native code, packaging or
+# signing, so source errors show up in minutes. Started by pushing a compile-* tag.
+on:
+  push:
+    tags: ['compile-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compile-check
+  cancel-in-progress: true
+
+jobs:
+  javac:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the submodules that are Gradle projects; the native ones are not compiled here.
+      - name: Fetch the Gradle submodules
+        run: git submodule update --init --recursive --depth 1 TMessagesProj/lib/jlatexmath TMessagesProj_Modules/media
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install the Android SDK packages the build pins
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null
+          "$sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" "ndk;30.0.16248370" "cmake;4.1.2" > /dev/null
+
+      - name: Put a placeholder services file in place
+        run: |
+          cat > TMessagesProj_App/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "100000000000",
+              "project_id": "jiqing-trial",
+              "storage_bucket": "jiqing-trial.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:100000000000:android:a1b2c3d4e5f60718",
+                  "android_client_info": { "package_name": "r.xs.rp" }
+                },
+                "oauth_client": [],
+                "api_key": [ { "current_key": "AIzaSyA-trial-placeholder-not-a-real-key" } ],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+
+      - name: Compile
+        run: |
+          # javac stops at 100 errors by default; one run should list them all.
+          cat > "$RUNNER_TEMP/javac.gradle" <<'GRADLE'
+          allprojects {
+              tasks.withType(JavaCompile).configureEach {
+                  options.compilerArgs += ['-Xmaxerrs', '10000']
+              }
+          }
+          GRADLE
+          bash ./gradlew --no-daemon --console=plain --continue -I "$RUNNER_TEMP/javac.gradle" :TMessagesProj_App:compileAfatReleaseJavaWithJavac

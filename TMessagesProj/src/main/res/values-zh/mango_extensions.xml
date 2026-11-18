@@ -5,8 +5,6 @@
     <string name="MenuProxyConnected">已连接</string>
     <string name="MenuProxyDisabled">未连接</string>
     <string name="ConnectingConnectProxy">连接代理</string>
-    <string name="FeedbackSupportChannel">问题反馈客服通道</string>
-    <string name="ContactSoftwareDeveloper">联系软件开发者</string>
     <string name="DeviceInfoTitle">设备信息</string>
     <string name="DeviceInfoCopyAll">复制全部</string>
     <string name="DeviceInfoInfo">这些信息仅在本机查看，用于排查设备、系统和性能相关问题。</string>
