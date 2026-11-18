@@ -12,7 +12,6 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.os.Build;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -32,6 +31,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.BlurredRecyclerView;
 import org.telegram.ui.Components.Easings;
 import org.telegram.ui.Components.LayoutHelper;
@@ -67,9 +67,9 @@ public class DialogsEmptyCell extends LinearLayout {
     private boolean utyanAnimationTriggered;
     private ValueAnimator utyanAnimator;
 
-    private RLottieImageView imageView;
-    private TextView titleView;
-    private TextViewSwitcher subtitleView;
+    private final RLottieImageView imageView;
+    private final TextView titleView;
+    private final TextViewSwitcher subtitleView;
 
     @EmptyType
     private int currentType = TYPE_UNSPECIFIED;
@@ -77,7 +77,7 @@ public class DialogsEmptyCell extends LinearLayout {
     @RawRes
     private int prevIcon;
 
-    private int currentAccount = UserConfig.selectedAccount;
+    private final int currentAccount = UserConfig.selectedAccount;
 
     public DialogsEmptyCell(Context context) {
         super(context);
@@ -97,7 +97,7 @@ public class DialogsEmptyCell extends LinearLayout {
         });
 
         titleView = new TextView(context);
-        titleView.setTextColor(Theme.getColor(Theme.key_chats_nameMessage_threeLines));
+        ThemeBind.textColor(titleView, Theme.key_chats_nameMessage_threeLines);
         titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         titleView.setTypeface(AndroidUtilities.bold());
         titleView.setGravity(Gravity.CENTER);
@@ -106,7 +106,7 @@ public class DialogsEmptyCell extends LinearLayout {
         subtitleView = new TextViewSwitcher(context);
         subtitleView.setFactory(() -> {
             TextView tv = new TextView(context);
-            tv.setTextColor(Theme.getColor(Theme.key_chats_message));
+            ThemeBind.textColor(tv, Theme.key_chats_message);
             tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             tv.setGravity(Gravity.CENTER);
             tv.setLineSpacing(AndroidUtilities.dp(2), 1);
@@ -277,7 +277,7 @@ public class DialogsEmptyCell extends LinearLayout {
             }
         }
         if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS) {
-            offset -= (int) (ActionBar.getCurrentActionBarHeight() / 2f) * (1f - utyanCollapseProgress);
+            offset -= (int) ((ActionBar.getCurrentActionBarHeight() / 2f) * (1f - utyanCollapseProgress));
         }
         imageView.setTranslationY(offset);
         titleView.setTranslationY(offset);
@@ -288,18 +288,12 @@ public class DialogsEmptyCell extends LinearLayout {
         int totalHeight;
         if (getParent() instanceof View) {
             View view = (View) getParent();
-            totalHeight = view.getMeasuredHeight();
-            if (view.getPaddingTop() != 0 && Build.VERSION.SDK_INT >= 21) {
-                totalHeight -= AndroidUtilities.statusBarHeight;
-            }
+            totalHeight = view.getMeasuredHeight() - view.getPaddingTop() - view.getPaddingBottom();
         } else {
             totalHeight = MeasureSpec.getSize(heightMeasureSpec);
         }
         if (totalHeight == 0) {
-            totalHeight = AndroidUtilities.displaySize.y - ActionBar.getCurrentActionBarHeight() - (Build.VERSION.SDK_INT >= 21 ? AndroidUtilities.statusBarHeight : 0);
-        }
-        if (getParent() instanceof BlurredRecyclerView) {
-            totalHeight -= ((BlurredRecyclerView) getParent()).blurTopPadding;
+            totalHeight = AndroidUtilities.displaySize.y - ActionBar.getCurrentActionBarHeight() - AndroidUtilities.statusBarHeight;
         }
 
         return (int) (totalHeight + (AndroidUtilities.dp(320) - totalHeight) * utyanCollapseProgress);
@@ -314,14 +308,14 @@ public class DialogsEmptyCell extends LinearLayout {
             if (getParent() instanceof View) {
                 View view = (View) getParent();
                 totalHeight = view.getMeasuredHeight();
-                if (view.getPaddingTop() != 0 && Build.VERSION.SDK_INT >= 21) {
+                if (view.getPaddingTop() != 0) {
                     totalHeight -= AndroidUtilities.statusBarHeight;
                 }
             } else {
                 totalHeight = MeasureSpec.getSize(heightMeasureSpec);
             }
             if (totalHeight == 0) {
-                totalHeight = AndroidUtilities.displaySize.y - ActionBar.getCurrentActionBarHeight() - (Build.VERSION.SDK_INT >= 21 ? AndroidUtilities.statusBarHeight : 0);
+                totalHeight = AndroidUtilities.displaySize.y - ActionBar.getCurrentActionBarHeight() - AndroidUtilities.statusBarHeight;
             }
 
             if (getParent() instanceof BlurredRecyclerView) {
@@ -332,7 +326,9 @@ public class DialogsEmptyCell extends LinearLayout {
             if (!arrayList.isEmpty()) {
                 totalHeight -= AndroidUtilities.dp(72) * arrayList.size() + arrayList.size() - 1 + AndroidUtilities.dp(12 + 38);
             }
-            super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(totalHeight, MeasureSpec.EXACTLY));
+            super.onMeasure(
+                MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(totalHeight, MeasureSpec.EXACTLY));
         } else {
             super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(166), MeasureSpec.EXACTLY));
         }

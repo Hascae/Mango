@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">連線代理</string>
     <string name="LocalHoldVerificationTitle">本地 Hold 認證</string>
     <string name="LocalHoldVerificationInfo">該帳號已通過 Hold 第三方認證。</string>
-    <string name="FeedbackSupportChannel">問題回饋客服通道</string>
-    <string name="ContactSoftwareDeveloper">聯繫軟體開發者</string>
     <string name="ExtensionFeatures">擴展中心</string>
     <string name="ExtensionFeaturesInfo">右上角三個點裡的快速開關仍然保留，這裡提供統一設定入口。</string>
     <string name="DeviceInfoTitle">設備資訊</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">快取檔案已刪除</string>
     <string name="CachedFileDeleteFailed">未找到可刪除的快取文件</string>
     <string name="SaveStickerToGallery">保存表情到相簿</string>
-    <string name="AccountCancellationBot">註銷帳號</string>
     <string name="UnlimitedChannelJoinTitle">突破加入頻道上限</string>
     <string name="UnlimitedChannelJoinInfo">預設為開啟。用戶端會減少本地加入頻道限制提示，但 Telegram 服務端傳回的真實限制仍可能生效。</string>
     <string name="UnlimitedDialogFiltersTitle">突破分組限制</string>

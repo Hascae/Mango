@@ -21,7 +21,11 @@ public class ChatActivityEnterViewAnimatedIconView extends RLottieImageView {
     private TransitState animatingState;
     private final int sizeDp;
 
-    private Map<TransitState, RLottieDrawable> stateMap = new HashMap<TransitState, RLottieDrawable>() {
+    private boolean formatMode;
+    private Drawable formatDrawable;
+    private final AnimatedFloat formatProgress = new AnimatedFloat(this, 0, 320, CubicBezierInterpolator.EASE_OUT_QUINT);
+
+    private final Map<TransitState, RLottieDrawable> stateMap = new HashMap<TransitState, RLottieDrawable>() {
         @Nullable
         @Override
         public RLottieDrawable get(@Nullable Object key) {
@@ -29,7 +33,9 @@ public class ChatActivityEnterViewAnimatedIconView extends RLottieImageView {
             if (obj == null) {
                 TransitState state = (TransitState) key;
                 int res = state.resource;
-                return new RLottieDrawable(res, String.valueOf(res), AndroidUtilities.dp(sizeDp), AndroidUtilities.dp(sizeDp));
+                RLottieDrawable rLottieDrawable = new RLottieDrawable(res, AndroidUtilities.dp(sizeDp), AndroidUtilities.dp(sizeDp));
+                put(state, rLottieDrawable);
+                return rLottieDrawable;
             }
             return obj;
         }
@@ -117,8 +123,8 @@ public class ChatActivityEnterViewAnimatedIconView extends RLottieImageView {
     private Drawable flipFrom;
     private long flipStart;
 
-    @Override
-    protected void onDraw(Canvas canvas) {
+    /** The icon itself, mid-flip when the skin morphs it from the previous one. */
+    private void drawIcon(Canvas canvas) {
         if (flipFrom == null) {
             super.onDraw(canvas);
             return;
@@ -156,6 +162,53 @@ public class ChatActivityEnterViewAnimatedIconView extends RLottieImageView {
             case VIDEO:
                 setContentDescription(LocaleController.getString(R.string.AccDescrVideoMessage));
                 break;
+        }
+    }
+
+    public void setFormatMode(boolean format, boolean animated) {
+        if (formatMode == format) {
+            return;
+        }
+        formatMode = format;
+        if (!animated) {
+            formatProgress.set(format, true);
+        }
+        invalidate();
+    }
+
+    public boolean isFormatMode() {
+        return formatMode;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        final float p = formatProgress.set(formatMode);
+        final float cx = getWidth() / 2f, cy = getHeight() / 2f;
+        if (p < 1) {
+            final boolean layer = p > 0;
+            if (layer) {
+                canvas.saveLayerAlpha(0, 0, getWidth(), getHeight(), (int) (0xFF * (1f - p)), Canvas.ALL_SAVE_FLAG);
+            } else {
+                canvas.save();
+            }
+            final float s = 0.4f + 0.6f * (1f - p);
+            canvas.scale(s, s, cx, cy);
+            drawIcon(canvas);
+            canvas.restore();
+        }
+        if (p > 0) {
+            if (formatDrawable == null) {
+                formatDrawable = getContext().getResources().getDrawable(R.drawable.msg_edit).mutate();
+            }
+            final int w = formatDrawable.getIntrinsicWidth() / 2, h = formatDrawable.getIntrinsicHeight() / 2;
+            formatDrawable.setBounds((int) cx - w, (int) cy - h, (int) cx + w, (int) cy + h);
+            formatDrawable.setColorFilter(getColorFilter());
+            formatDrawable.setAlpha((int) (0xFF * p));
+            canvas.save();
+            final float s = 0.4f + 0.6f * p;
+            canvas.scale(s, s, cx, cy);
+            formatDrawable.draw(canvas);
+            canvas.restore();
         }
     }
 

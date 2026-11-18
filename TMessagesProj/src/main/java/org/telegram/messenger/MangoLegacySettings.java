@@ -87,7 +87,6 @@ public final class MangoLegacySettings {
         items.add(new Setting("media_tap", R.string.NextMediaTap, () -> SharedConfig.nextMediaTap, v -> { if (SharedConfig.nextMediaTap != (Boolean) v) SharedConfig.toggleNextMediaTap(); }, true));
         items.add(new Setting("emoji_suggestions", R.string.SuggestAnimatedEmoji, () -> SharedConfig.suggestAnimatedEmoji, v -> { if (SharedConfig.suggestAnimatedEmoji != (Boolean) v) SharedConfig.toggleSuggestAnimatedEmoji(); }, true));
         items.add(new Setting("sticker_order", R.string.DynamicPackOrder, () -> SharedConfig.updateStickersOrderOnSend, v -> { if (SharedConfig.updateStickersOrderOnSend != (Boolean) v) SharedConfig.toggleUpdateStickersOrderOnSend(); }, true));
-        items.add(new Setting("inapp_browser", R.string.InappBrowser, () -> SharedConfig.inappBrowser, v -> { if (SharedConfig.inappBrowser != (Boolean) v) SharedConfig.toggleInappBrowser(); }, true));
         items.add(new Setting("save_stream_media", R.string.SaveToGallery, () -> SharedConfig.saveStreamMedia, v -> { if (SharedConfig.saveStreamMedia != (Boolean) v) SharedConfig.toggleSaveStreamMedia(); }, true));
         items.add(new Setting("sort_contacts", R.string.SortedByName, () -> SharedConfig.sortContactsByName, v -> { if (SharedConfig.sortContactsByName != (Boolean) v) SharedConfig.toggleSortContactsByName(); }, false));
         items.add(new Setting("sort_files", R.string.SortedByName, () -> SharedConfig.sortFilesByName, v -> { if (SharedConfig.sortFilesByName != (Boolean) v) SharedConfig.toggleSortFilesByName(); }, false));

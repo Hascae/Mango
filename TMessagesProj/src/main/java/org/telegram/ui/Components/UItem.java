@@ -91,10 +91,24 @@ public class UItem extends AdapterWithDiffUtils.Item {
         i.intValue = LayoutHelper.MATCH_PARENT;
         return i;
     }
+    public static UItem asCustomShadow(int id, View view) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_CUSTOM_SHADOW, false);
+        i.id = id;
+        i.view = view;
+        i.intValue = LayoutHelper.MATCH_PARENT;
+        return i;
+    }
     public static UItem asCustomShadow(View view) {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_CUSTOM_SHADOW, false);
         i.view = view;
         i.intValue = LayoutHelper.MATCH_PARENT;
+        return i;
+    }
+    public static UItem asCustomShadow(View view, boolean noclip) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_CUSTOM_SHADOW, false);
+        i.view = view;
+        i.intValue = LayoutHelper.MATCH_PARENT;
+        i.checked = noclip;
         return i;
     }
     public static UItem asCustom(View view, int heightDp) {
@@ -112,6 +126,16 @@ public class UItem extends AdapterWithDiffUtils.Item {
 
     public static UItem asFullyCustom(View view) {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_FULLY_CUSTOM, false);
+        i.view = view;
+        return i;
+    }
+
+    /**
+     * Adds a custom item whose wrapper always has the full measured height of its RecyclerView.
+     * Unlike asFullscreenCustom(), this method never subtracts ActionBar, inset or padding values.
+     */
+    public static UItem asViewportCustom(View view) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_VIEWPORT_CUSTOM, false);
         i.view = view;
         return i;
     }
@@ -160,11 +184,38 @@ public class UItem extends AdapterWithDiffUtils.Item {
         return i;
     }
 
+    public static UItem asTopView(CharSequence title, CharSequence subtitle, String setName, String emoji) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TOPVIEW, false);
+        i.text = title;
+        i.animatedText = subtitle;
+        i.subtext = setName;
+        i.textValue = emoji;
+        return i;
+    }
+
+    public static UItem asTopView(CharSequence title, CharSequence subtitle, int emojiSize, String setName, String emoji) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TOPVIEW, false);
+        i.text = title;
+        i.animatedText = subtitle;
+        i.subtext = setName;
+        i.textValue = emoji;
+        i.intValue = emojiSize;
+        return i;
+    }
+
     public static UItem asTopView(CharSequence text, String setName, String emoji) {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TOPVIEW, false);
         i.text = text;
         i.subtext = setName;
         i.textValue = emoji;
+        return i;
+    }
+
+    public static UItem asTopView(CharSequence title, CharSequence text, int lottieResId) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TOPVIEW, false);
+        i.text = title;
+        i.animatedText = text;
+        i.iconResId = lottieResId;
         return i;
     }
 
@@ -187,6 +238,14 @@ public class UItem extends AdapterWithDiffUtils.Item {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TEXT, false);
         i.id = id;
         i.text = text;
+        return i;
+    }
+
+    public static UItem asButtonLoadingValue(int id, CharSequence text) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TEXT, false);
+        i.id = id;
+        i.text = text;
+        i.locked = true;
         return i;
     }
 
@@ -273,6 +332,14 @@ public class UItem extends AdapterWithDiffUtils.Item {
         return i;
     }
 
+    public static UItem asRadio2(int id, CharSequence text, CharSequence value) {
+        UItem i = new UItem(UniversalAdapter.VIEW_TYPE_RADIO_2, false);
+        i.id = id;
+        i.text = text;
+        i.textValue = value;
+        return i;
+    }
+
     public static UItem asButtonCheck(int id, CharSequence text, CharSequence subtext) {
         UItem i = new UItem(UniversalAdapter.VIEW_TYPE_TEXT_CHECK, false);
         i.id = id;
@@ -332,6 +399,12 @@ public class UItem extends AdapterWithDiffUtils.Item {
     public static UItem asAddChat(Long dialogId) {
         UItem item = new UItem(UniversalAdapter.VIEW_TYPE_USER_ADD, false);
         item.dialogId = dialogId;
+        return item;
+    }
+    public static UItem asAddChat(Long dialogId, String query) {
+        UItem item = new UItem(UniversalAdapter.VIEW_TYPE_USER_ADD, false);
+        item.dialogId = dialogId;
+        item.textValue = query;
         return item;
     }
 
@@ -468,6 +541,15 @@ public class UItem extends AdapterWithDiffUtils.Item {
         UItem item = new UItem(UniversalAdapter.VIEW_TYPE_SWITCH, false);
         item.id = id;
         item.text = text;
+        item.intValue = 1;
+        return item;
+    }
+
+    public static UItem asSwitchNoIcon(int id, CharSequence text) {
+        UItem item = new UItem(UniversalAdapter.VIEW_TYPE_SWITCH, false);
+        item.id = id;
+        item.text = text;
+        item.intValue = 0;
         return item;
     }
 
@@ -574,6 +656,11 @@ public class UItem extends AdapterWithDiffUtils.Item {
 
     public UItem setClickCallback2(View.OnClickListener clickCallback) {
         this.clickCallback2 = clickCallback;
+        return this;
+    }
+
+    public UItem setId(int id) {
+        this.id = id;
         return this;
     }
 
@@ -726,6 +813,30 @@ public class UItem extends AdapterWithDiffUtils.Item {
     }
 
     public boolean itemContentEquals(UItem item) {
+        if (viewType == item.viewType) {
+            if (id != item.id) return false;
+            if (enabled != item.enabled) return false;
+            switch (viewType) {
+                case UniversalAdapter.VIEW_TYPE_SHADOW:
+                    if (text == null && item.text == null)
+                        return true;
+                case UniversalAdapter.VIEW_TYPE_HEADER:
+                case UniversalAdapter.VIEW_TYPE_BLACK_HEADER:
+                case UniversalAdapter.VIEW_TYPE_LARGE_HEADER:
+                    return TextUtils.equals(text, item.text);
+                case UniversalAdapter.VIEW_TYPE_FLICKER:
+                    return intValue == item.intValue;
+                case UniversalAdapter.VIEW_TYPE_TEXT:
+                    return (
+                        object == item.object &&
+                        TextUtils.equals(text, item.text) &&
+                        TextUtils.equals(textValue, item.textValue) &&
+                        iconResId == item.iconResId &&
+                        accent == item.accent &&
+                        red == item.red
+                    );
+            }
+        }
         return super.contentsEquals(item);
     }
 

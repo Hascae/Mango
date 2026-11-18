@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">प्रॉक्सी कनेक्ट करें</string>
     <string name="LocalHoldVerificationTitle">स्थानीय होल्ड प्रमाणीकरण</string>
     <string name="LocalHoldVerificationInfo">इस खाते ने होल्ड थर्ड-पार्टी सत्यापन पारित कर दिया है।</string>
-    <string name="FeedbackSupportChannel">समस्या प्रतिक्रिया ग्राहक सेवा चैनल</string>
-    <string name="ContactSoftwareDeveloper">सॉफ़्टवेयर डेवलपर से संपर्क करें</string>
     <string name="ExtensionFeatures">विस्तार केंद्र</string>
     <string name="ExtensionFeaturesInfo">ऊपरी दाएं कोने में तीन बिंदुओं में शॉर्टकट स्विच अभी भी बरकरार हैं, और यहां एक एकीकृत सेटिंग प्रवेश द्वार प्रदान किया गया है।</string>
     <string name="DeviceInfoTitle">डिवाइस की जानकारी</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">कैश फ़ाइल हटा दी गई है</string>
     <string name="CachedFileDeleteFailed">कोई कैश फ़ाइल नहीं मिली जिसे हटाया जा सके</string>
     <string name="SaveStickerToGallery">फोटो एलबम में इमोटिकॉन्स सहेजें</string>
-    <string name="AccountCancellationBot">खाता खारिज करना</string>
     <string name="UnlimitedChannelJoinTitle">चैनल जोड़ने की ऊपरी सीमा को तोड़ें</string>
     <string name="UnlimitedChannelJoinInfo">डिफ़ॉल्ट रूप से सक्षम है। क्लाइंट स्थानीय जॉइन चैनल सीमा संकेत को कम कर देगा, लेकिन टेलीग्राम सर्वर द्वारा लौटाई गई वास्तविक सीमा अभी भी प्रभावी हो सकती है।</string>
     <string name="UnlimitedDialogFiltersTitle">समूहीकरण सीमा को तोड़ता है</string>

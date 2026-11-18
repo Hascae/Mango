@@ -14,7 +14,6 @@
     "values-tr": "tr"
   },
   "keys": {
-    "AccountCancellationBot": "strings.xml",
     "AntiRevoke": "strings.xml",
     "AppIconAqua": "strings.xml",
     "AppIconClassicBlue": "strings.xml",
@@ -102,7 +101,6 @@
     "ClearLocalVirtualGiftsInfo": "strings.xml",
     "ClearLocalVirtualGiftsTitle": "strings.xml",
     "ConnectingConnectProxy": "strings.xml",
-    "ContactSoftwareDeveloper": "strings.xml",
     "ContactsTabTitle": "strings.xml",
     "ContinueScrollChannelJump": "strings.xml",
     "CustomDownloadPathApplied": "strings.xml",
@@ -234,7 +232,6 @@
     "ExtensionMessageActions": "extension_tools_strings.xml",
     "ExtensionPersonalWallpapers": "extension_tools_strings.xml",
     "ExtensionToolsHeader": "extension_tools_strings.xml",
-    "FeedbackSupportChannel": "strings.xml",
     "FirstLaunchProxyExitButton": "strings.xml",
     "FirstLaunchProxyExitMessage": "strings.xml",
     "FirstLaunchProxyExitTitle": "strings.xml",

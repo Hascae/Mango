@@ -3,6 +3,7 @@ package org.telegram.ui.Components;
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.getString;
 
+import org.telegram.messenger.FileLog;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -19,6 +20,7 @@ import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Cells.CheckBoxCell;
 import org.telegram.ui.Components.Premium.boosts.cells.selector.SelectorBtnCell;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
@@ -42,6 +44,7 @@ public class AdminLogFilterAlert2 extends BottomSheetWithRecyclerListView {
         super(fragment.getContext(), fragment, false, false, false, true, ActionBarType.SLIDING, fragment.getResourceProvider());
         topPadding = 0.35f;
         fixNavigationBar();
+        setBackgroundColor(themedBackgroundColor = Theme.getColor(Theme.key_dialogBackgroundGray, resourcesProvider));
         setSlidingActionBar();
         setShowHandle(true);
 
@@ -102,8 +105,9 @@ public class AdminLogFilterAlert2 extends BottomSheetWithRecyclerListView {
         buttonContainer.setClickable(true);
         buttonContainer.setOrientation(LinearLayout.VERTICAL);
         buttonContainer.setPadding(dp(10), dp(10), dp(10), dp(10));
-        buttonContainer.setBackgroundColor(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
+        ThemeBind.backgroundColor(buttonContainer, Theme.key_dialogBackgroundGray, resourcesProvider);
         actionButton = new ButtonWithCounterView(getContext(), resourcesProvider);
+        actionButton.setRound();
         actionButton.setText(getString(R.string.EventLogFilterApply), false);
         actionButton.setOnClickListener(v -> {
             if (currentFilter.join &&
@@ -135,6 +139,7 @@ public class AdminLogFilterAlert2 extends BottomSheetWithRecyclerListView {
         containerView.addView(buttonContainer, LayoutHelper.createFrameMarginPx(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, backgroundPaddingLeft, 0, backgroundPaddingLeft, 0));
 
         recyclerListView.setPadding(backgroundPaddingLeft, 0, backgroundPaddingLeft, dp(68));
+        recyclerListView.setSections();
     }
 
     @Override
@@ -214,6 +219,7 @@ public class AdminLogFilterAlert2 extends BottomSheetWithRecyclerListView {
 
     public void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (currentFilter == null) return;
+        items.add(UItem.asShadow(null));
         items.add(UItem.asHeader(getString(R.string.EventLogFilterByActions)));
         items.add(UItem.asRoundGroupCheckbox(FILTER_SECTION_MEMBERS, getString(isMegagroup ? R.string.EventLogFilterSectionMembers : R.string.EventLogFilterSectionSubscribers), getGroupCount(0)).setChecked(
             currentFilter.promote || currentFilter.demote ||
@@ -404,5 +410,21 @@ public class AdminLogFilterAlert2 extends BottomSheetWithRecyclerListView {
     @Override
     protected boolean canDismissWithSwipe() {
         return !recyclerListView.canScrollVertically(-1);
+    }
+
+    private int themedBackgroundColor;
+
+    @Override
+    public void onThemeColorsChanged() {
+        try {
+            super.onThemeColorsChanged();
+            final int color = Theme.getColor(Theme.key_dialogBackgroundGray, resourcesProvider);
+            if (color != themedBackgroundColor) {
+                themedBackgroundColor = color;
+                setBackgroundColor(color);
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
     }
 }

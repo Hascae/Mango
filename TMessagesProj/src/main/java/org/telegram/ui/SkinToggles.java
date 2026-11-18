@@ -121,23 +121,15 @@ final class SkinToggles {
             }
             SharedConfig.currentProxy = SharedConfig.proxyList.get(0);
             if (!enabled) {
-                preferences.edit()
-                        .putString("proxy_ip", SharedConfig.currentProxy.address)
-                        .putString("proxy_pass", SharedConfig.currentProxy.password)
-                        .putString("proxy_user", SharedConfig.currentProxy.username)
-                        .putInt("proxy_port", SharedConfig.currentProxy.port)
-                        .putString("proxy_secret", SharedConfig.currentProxy.secret)
-                        .commit();
+                final SharedPreferences.Editor proxyEditor = preferences.edit();
+                SharedConfig.currentProxy.settings.toSharedPreferences(proxyEditor);
+                proxyEditor.commit();
             }
         }
         enabled = !enabled;
-        SharedPreferences.Editor editor = preferences.edit().putBoolean("proxy_enabled", enabled);
-        if (!enabled) {
-            editor.putBoolean("proxy_enabled_calls", false);
-        }
-        editor.commit();
+        preferences.edit().putBoolean("proxy_enabled", enabled).commit();
         SharedConfig.ProxyInfo proxy = SharedConfig.currentProxy;
-        ConnectionsManager.setProxySettings(enabled, proxy.address, proxy.port, proxy.username, proxy.password, proxy.secret);
+        ConnectionsManager.setProxySettings(enabled, proxy.settings);
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
         ProxyRotationController.refreshSchedule(enabled && SharedConfig.proxyRotationEnabled);
     }
