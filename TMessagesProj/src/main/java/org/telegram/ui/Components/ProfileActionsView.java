@@ -11,24 +11,27 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.RenderNode;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
+import android.os.Bundle;
 import android.text.Layout;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.util.SparseIntArray;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeProvider;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RawRes;
 import androidx.annotation.StringRes;
 import androidx.core.graphics.ColorUtils;
@@ -44,6 +47,9 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.SkinMetal;
 import org.telegram.ui.SkinSwitch;
 import org.telegram.ui.ProfileActivity;
+import org.telegram.ui.Cells.ChatMessageCell;
+import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -61,16 +67,15 @@ public class ProfileActionsView extends View {
     public boolean isAnimatingCallAction = false;
     public boolean isOpeningLayout = true;
     public float clipHeight = -1;
-    private final Path clipAvatarPath = new Path();
-    private final Path clipPath = new Path();
-    private ProfileActivity.AvatarImageView avatarView;
-    private float renderNodeScale;
-    private float renderNodeTranslateY;
-    private RenderNode renderNode;
+
+    /** The buttons' glass, one drawable per drawn button in order; without it they are filled with their color. */
+    @Nullable
+    private BlurredBackgroundDrawableViewFactory glassFactory;
+    private final ArrayList<BlurredBackgroundDrawable> glass = new ArrayList<>();
+    private int glassUsed;
 
     private int activeCount = 0;
     private final int targetHeight;
-    private boolean ignoreRect = false;
     private float currentHeight = 0;
 
     private OnActionClickListener onActionClickListener = null;
@@ -136,24 +141,36 @@ public class ProfileActionsView extends View {
         this.targetHeight = (int) (targetHeight - ypadding - top);
 
         setBackgroundColor(0);
+
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
 
-    public void drawingBlur(boolean drawing) {
-        if (ignoreRect != drawing || renderNode != null) {
-            ignoreRect = drawing;
-            renderNode = null;
-            avatarView = null;
-            invalidate();
-        }
-    }
-
-    public void drawingBlur(RenderNode renderNode, ProfileActivity.AvatarImageView avatarView, float scale, float dy) {
-        this.ignoreRect = false;
-        this.renderNode = renderNode;
-        this.avatarView = avatarView;
-        this.renderNodeScale = scale;
-        this.renderNodeTranslateY = dy;
+    /** The buttons on glass, see {@link ProfileButtonsGlass#actionsFactory}. */
+    public void setGlassFactory(@Nullable BlurredBackgroundDrawableViewFactory factory) {
+        glassFactory = factory;
+        glass.clear();
+        glassUsed = 0;
         invalidate();
+    }
+
+    private void drawGlass(Canvas canvas, RectF rect, float radius, float alpha) {
+        if (glassUsed == glass.size()) {
+            glass.add(glassFactory.create(this, ProfileButtonsGlass.NO_COLORS).setRadius(radius));
+        }
+        final BlurredBackgroundDrawable drawable = glass.get(glassUsed++);
+        drawable.setBounds((int) rect.left, (int) rect.top, (int) Math.ceil(rect.right), (int) Math.ceil(rect.bottom));
+        drawable.setAlpha((int) (0xFF * alpha));
+        drawable.draw(canvas);
+    }
+
+    /** The glass of the buttons that are not drawn any more is out of the capture. */
+    private void hideUnusedGlass() {
+        for (int i = glassUsed; i < glass.size(); i++) {
+            final BlurredBackgroundDrawable drawable = glass.get(i);
+            if (!drawable.getBounds().isEmpty()) {
+                drawable.setBounds(0, 0, 0, 0);
+            }
+        }
     }
 
     public void setOnActionClickListener(OnActionClickListener onActionClickListener) {
@@ -231,9 +248,11 @@ public class ProfileActionsView extends View {
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
+        glassUsed = 0;
         if (clipHeight >= 0f) {
             final float bottom = clipHeight - getY();
             if (bottom <= 0) {
+                hideUnusedGlass();
                 return;
             }
             canvas.clipRect(0f, 0f, getMeasuredWidth(), bottom);
@@ -242,6 +261,7 @@ public class ProfileActionsView extends View {
         float height = Math.max(0f, currentHeight - ypadding - top);
 
         if (height <= 0f) {
+            hideUnusedGlass();
             return;
         }
 
@@ -249,10 +269,6 @@ public class ProfileActionsView extends View {
         final float width = getItemWidth();
         float left = xpadding;
         float r = getRoundRadius();
-
-        if (renderNode != null) {
-            clipPath.rewind();
-        }
 
         Action newFirstAction = null, newLastAction = null;
         int c = actions.size();
@@ -271,15 +287,6 @@ public class ProfileActionsView extends View {
             }
 
             action.updatePosition();
-            if (renderNode != null) {
-                AndroidUtilities.rectTmp.set(action.rect);
-                AndroidUtilities.rectTmp.inset(
-                    action.rect.width() / 2.0f * (1.0f - action.getScale()),
-                    action.rect.height() / 2.0f * (1.0f - action.getScale())
-                );
-                AndroidUtilities.rectTmp.inset(-1, -1);
-                clipPath.addRoundRect(AndroidUtilities.rectTmp, r, r, Path.Direction.CCW);
-            }
         }
         firstAction = newFirstAction;
         lastAction = newLastAction;
@@ -287,53 +294,51 @@ public class ProfileActionsView extends View {
         float fraction = Utilities.clamp01(height / targetHeight);
         float alphaFraction1 = Utilities.clamp01((fraction - 0.2f) / 0.8f);
         if (alphaFraction1 <= 0f) {
+            hideUnusedGlass();
             return;
         }
 
-        if (!ignoreRect) {
-            for (int i = 0; i < c; i++) {
-                Action action = actions.get(i);
-                if (!action.isDeleted) {
-                    if (SkinSwitch.PROFILE) {
-                        // Pressed, a key sinks into the slab: it shrinks with Telegram's bounce and its cast
-                        // shadow goes. The canvas scales it, so its sheen's gradient is not rebuilt every frame.
-                        final float scale = action.getScale();
-                        canvas.save();
-                        canvas.scale(scale, scale, action.rect.centerX(), action.rect.centerY());
-                        SkinMetal.drawKey(canvas, action.rect, r, skinMaterials(), action.getAlpha() * alphaFraction1, 1f - action.getPressed());
-                        canvas.restore();
-                        continue;
-                    }
-                    AndroidUtilities.rectTmp.set(action.rect);
-                    AndroidUtilities.rectTmp.inset(
-                        action.rect.width() / 2.0f * (1.0f - action.getScale()),
-                        action.rect.height() / 2.0f * (1.0f - action.getScale())
-                    );
-                    int wasAlpha = paint.getAlpha();
-                    int newAlpha = (int) (action.getAlpha() * alphaFraction1 * wasAlpha);
-                    paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f : 1f)));
-
-                    if (SharedConfig.shadowsInSections && isButtonColorLight() && parentExpanded < 0.5f) {
-                        paint.setShadowLayer(dpf2(1.5f), 0, 0, Theme.multAlpha(Color.BLACK & 0x20FFFFFF, (newAlpha / 255f * (radialGradient != null ? 0.1f : 1f))));
-                    } else {
-                        paint.setShadowLayer(0, 0, 0, 0);
-                    }
-
-                    canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, paint);
-                    if (radialGradient != null) {
-                        int wasAlpha2 = shaderPaint.getAlpha();
-                        shaderPaint.setAlpha((int) (action.getAlpha() * alphaFraction1 * wasAlpha2));
-                        matrix.setTranslate(AndroidUtilities.rectTmp.left, AndroidUtilities.rectTmp.top);
-                        radialGradient.setLocalMatrix(matrix);
-                        canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, shaderPaint);
-                        shaderPaint.setAlpha(wasAlpha2);
-                    }
-                    paint.setAlpha(wasAlpha);
-                }
+        for (int i = 0; i < c; i++) {
+            Action action = actions.get(i);
+            if (action.isDeleted) {
+                continue;
             }
-        }
+            if (SkinSwitch.PROFILE) {
+                // Pressed, a key sinks into the slab: it shrinks with Telegram's bounce and its cast
+                // shadow goes. The canvas scales it, so its sheen's gradient is not rebuilt every frame.
+                final float scale = action.getScale();
+                canvas.save();
+                canvas.scale(scale, scale, action.rect.centerX(), action.rect.centerY());
+                SkinMetal.drawKey(canvas, action.rect, r, skinMaterials(), action.getAlpha() * alphaFraction1, 1f - action.getPressed());
+                canvas.restore();
+                continue;
+            }
+            AndroidUtilities.rectTmp.set(action.rect);
+            AndroidUtilities.rectTmp.inset(
+                action.rect.width() / 2.0f * (1.0f - action.getScale()),
+                action.rect.height() / 2.0f * (1.0f - action.getScale())
+            );
+            if (glassFactory != null) {
+                drawGlass(canvas, AndroidUtilities.rectTmp, r, action.getAlpha() * alphaFraction1);
+                continue;
+            }
+            int wasAlpha = paint.getAlpha();
+            int newAlpha = (int) (action.getAlpha() * alphaFraction1 * wasAlpha);
+            paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f : 1f)));
+            paint.setShadowLayer(0, 0, 0, 0);
 
-        drawRenderNode(canvas);
+            canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, paint);
+            if (radialGradient != null) {
+                int wasAlpha2 = shaderPaint.getAlpha();
+                shaderPaint.setAlpha((int) (action.getAlpha() * alphaFraction1 * wasAlpha2));
+                matrix.setTranslate(AndroidUtilities.rectTmp.left, AndroidUtilities.rectTmp.top);
+                radialGradient.setLocalMatrix(matrix);
+                canvas.drawRoundRect(AndroidUtilities.rectTmp, r, r, shaderPaint);
+                shaderPaint.setAlpha(wasAlpha2);
+            }
+            paint.setAlpha(wasAlpha);
+        }
+        hideUnusedGlass();
 
         float alphaFraction2 = Utilities.clamp01((fraction - 0.4f) / 0.6f);
         if (alphaFraction2 > 0f) {
@@ -341,40 +346,6 @@ public class ProfileActionsView extends View {
                 drawAction(canvas, actions.get(i), fraction, alphaFraction2);
             }
         }
-    }
-
-    private void drawRenderNode(Canvas canvas) {
-        if (SkinSwitch.PROFILE || renderNode == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !renderNode.hasDisplayList() || !canvas.isHardwareAccelerated()) {
-            return;
-        }
-
-        canvas.save();
-        if (avatarView != null) {
-            View v = (View) avatarView.getParent();
-            float vl = v.getX();
-            float vt = v.getY() - getTranslationY();
-            float vw = v.getWidth() * v.getScaleX();
-            float vh = v.getHeight() * v.getScaleY();
-
-            clipAvatarPath.rewind();
-            clipAvatarPath.addRoundRect(
-                    vl,
-                    vt,
-                    vl + vw,
-                    vt + vh,
-                    avatarView.getRoundRadiusForExpand() * v.getScaleX(),
-                    avatarView.getRoundRadiusForExpand() * v.getScaleY(),
-                    Path.Direction.CCW
-            );
-            canvas.clipPath(clipAvatarPath);
-        }
-
-        canvas.clipPath(clipPath);
-        canvas.translate(0f, renderNodeTranslateY);
-        canvas.scale(renderNodeScale, renderNodeScale);
-        canvas.drawRenderNode(renderNode);
-
-        canvas.restore();
     }
 
     public void stopLoading(int key) {
@@ -415,10 +386,8 @@ public class ProfileActionsView extends View {
         }
 
         final boolean isButtonColorLight = isButtonColorLight();
+        // over the photo the buttons are the dimmed photo on every Android (see ProfileButtonsGlass): white icons there
         float useFilledWhiteIcon = !isButtonColorLight ? 1 : MathUtils.clamp((parentExpanded - 0.75f) / 0.25f, 0, 1);
-        if (isButtonColorLight && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            useFilledWhiteIcon = 0f;
-        }
         int labelColor = 0;
         if (SkinSwitch.PROFILE) {
             // One glyph in the metal's ink; the label in its quieter ink.
@@ -769,6 +738,7 @@ public class ProfileActionsView extends View {
                 } else {
                     insertIfAvailable(out, KEY_VOICE_CHAT);
                     insertIfNotAvailable(out, KEY_STREAM, KEY_VOICE_CHAT);
+                    insertIfAvailable(out, KEY_STORY);
                     insertIfAvailable(out, KEY_LEAVE);
                 }
                 break;
@@ -1226,8 +1196,7 @@ public class ProfileActionsView extends View {
                 return;
             }
             if (animatedRes != 0) {
-                RLottieDrawable drawable = new RLottieDrawable(animatedRes, String.valueOf(animatedRes),
-                    dp(56), dp(56), false, null);
+                RLottieDrawable drawable = new RLottieDrawable(animatedRes, dp(56), dp(56), false, null);
                 drawable.setMasterParent(ProfileActionsView.this);
                 drawable.start();
                 drawableAnimated = drawable;
@@ -1295,5 +1264,115 @@ public class ProfileActionsView extends View {
             this.outlineIcon = outlineIcon;
             this.skinIcon = skinIcon;
         }
+    }
+
+    private AccessibilityNodeProvider accessibilityNodeProvider;
+    @Override
+    public AccessibilityNodeProvider getAccessibilityNodeProvider() {
+        if (accessibilityNodeProvider == null) {
+            accessibilityNodeProvider = new AccessibilityNodeProvider() {
+                @Override
+                public AccessibilityNodeInfo createAccessibilityNodeInfo(int virtualViewId) {
+                    int[] pos = {0, 0};
+                    getLocationOnScreen(pos);
+                    if (virtualViewId == HOST_VIEW_ID) {
+                        AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain(ProfileActionsView.this);
+                        onInitializeAccessibilityNodeInfo(info);
+                        info.setEnabled(true);
+
+                        for (int i = 0; i < actions.size(); ++i) {
+                            info.addChild(ProfileActionsView.this, actions.get(i).key);
+                        }
+
+                        return info;
+                    } else {
+                        Action action = null;
+                        for (int i = 0; i < actions.size(); ++i) {
+                            if (actions.get(i).key == virtualViewId) {
+                                action = actions.get(i);
+                                break;
+                            }
+                        }
+                        if (action == null) return null;
+                        if (action.rect.isEmpty()) return null;
+
+                        AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain();
+                        info.setSource(ProfileActionsView.this, virtualViewId);
+                        info.setParent(ProfileActionsView.this);
+                        info.setPackageName(getContext().getPackageName());
+
+                        info.addAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        info.addAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
+                        info.setClickable(true);
+                        info.setFocusable(true);
+                        info.setEnabled(true);
+                        info.setVisibleToUser(true);
+                        info.setClassName(android.widget.Button.class.getName());
+
+                        info.setText(action.text.getText());
+
+                        Rect parentBounds = new Rect(
+                                (int) action.rect.left,
+                                (int) action.rect.top,
+                                (int) action.rect.right,
+                                (int) action.rect.bottom
+                        );
+                        info.setBoundsInParent(parentBounds);
+                        parentBounds.offset(pos[0], pos[1]);
+                        info.setBoundsInScreen(parentBounds);
+
+                        return info;
+                    }
+                }
+
+                @Override
+                public boolean performAction(int virtualViewId, int action, @Nullable Bundle arguments) {
+                    if (virtualViewId == HOST_VIEW_ID) {
+                        return performAccessibilityAction(action, arguments);
+                    }
+
+                    Action button = null;
+                    for (int i = 0; i < actions.size(); ++i) {
+                        if (actions.get(i).key == virtualViewId) {
+                            button = actions.get(i);
+                            break;
+                        }
+                    }
+                    if (button == null) return false;
+
+                    if (action == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
+                        sendAccessibilityEventForVirtualView(virtualViewId, AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+                        return true;
+                    } else if (action == AccessibilityNodeInfo.ACTION_CLICK) {
+                        if (onActionClickListener != null) {
+                            onActionClickListener.onClick(virtualViewId, 0, 0);
+                        }
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                private void sendAccessibilityEventForVirtualView(int viewId, int eventType) {
+                    sendAccessibilityEventForVirtualView(viewId, eventType, null);
+                }
+
+                private void sendAccessibilityEventForVirtualView(int viewId, int eventType, String text) {
+                    AccessibilityManager am = (AccessibilityManager) getContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
+                    if (am.isTouchExplorationEnabled()) {
+                        AccessibilityEvent event = AccessibilityEvent.obtain(eventType);
+                        event.setPackageName(getContext().getPackageName());
+                        event.setSource(ProfileActionsView.this, viewId);
+                        if (text != null) {
+                            event.getText().add(text);
+                        }
+                        if (getParent() != null) {
+                            getParent().requestSendAccessibilityEvent(ProfileActionsView.this, event);
+                        }
+                    }
+                }
+            };
+        }
+        return accessibilityNodeProvider;
     }
 }

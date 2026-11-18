@@ -83,8 +83,6 @@
     <uses-permission android:name="com.android.vending.BILLING"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="replace" />
 
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-
     <uses-sdk tools:overrideLibrary="com.google.mlkit.vision.segmentation.subject"/>
 
     <queries>
@@ -312,6 +310,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="tg" />
             </intent-filter>
+            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ton" android:host="transfer" android:pathPrefix="/" />
+            </intent-filter>
+            <intent-filter android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:priority="1">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tc" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="org.telegram.messenger.CREATE_STICKER_PACK"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -337,12 +347,14 @@
         </activity-alias>
         <activity
             android:name="org.telegram.ui.BubbleActivity"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode|smallestScreenSize|screenLayout"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"
             android:allowEmbedded="true"
             android:documentLaunchMode="always"
             android:resizeableActivity="true"/>
+        <!-- Development: widget-sandbox's conformance set on the widget renderer, launched by adb.
+             Finishes at once outside internal (DEBUG_PRIVATE_VERSION) builds. -->
         <activity
             android:name="org.telegram.ui.ShareActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
@@ -469,14 +481,6 @@
         </receiver>
 
         <receiver
-            android:name=".AutoMessageReplyReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="org.telegram.messenger.ACTION_MESSAGE_REPLY"/>
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name=".SmsReceiver"
             android:exported="true">
             <intent-filter>
@@ -489,6 +493,13 @@
                 <action android:name="android.intent.action.PHONE_STATE"/>
             </intent-filter>
         </receiver>
+
+        <!-- The widget engine (HTML widgets' code): no permissions, files or network; one process for every widget. -->
+        <service
+            android:name="org.telegram.utils.twidget.WidgetEngineService"
+            android:process=":widgets"
+            android:isolatedProcess="true"
+            android:exported="false" />
 
         <service
             android:name=".AuthenticatorService"
@@ -561,7 +572,7 @@
             android:name=".LocationSharingService"
             android:enabled="true"
             android:exported="true"
-            android:foregroundServiceType="location|dataSync"
+            android:foregroundServiceType="location"
         />
         <service
             android:name=".voip.VoIPService"
@@ -626,6 +637,15 @@
         </receiver>
 
         <receiver android:name=".WearReplyReceiver" android:enabled="true"/>
+
+        <service
+            android:name=".WearAuthListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/tg-wear-auth/" />
+            </intent-filter>
+        </service>
 
         <receiver android:name=".StopLiveLocationReceiver" android:enabled="true"/>
 
@@ -722,8 +742,24 @@
 
         <meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true" />
 
+        <!--
         <meta-data android:name="com.google.android.gms.car.notification.SmallIcon" android:resource="@drawable/ic_player" />
         <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
+
+        <service
+            android:name="org.telegram.messenger.car.TelegramCarAppService"
+            android:exported="true"
+            android:foregroundServiceType="connectedDevice">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.MESSAGING" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="5" />
+        -->
 
         <meta-data android:name="com.google.android.gms.vision.DEPENDENCIES" android:value="face,barcode" />
 

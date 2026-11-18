@@ -38,6 +38,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.BillingController;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.Emoji;
@@ -57,6 +58,7 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.AvatarSpan;
 import org.telegram.ui.Cells.GraySectionCell;
 import org.telegram.ui.Cells.HeaderCell;
@@ -147,7 +149,10 @@ public class InviteLinkBottomSheet extends BottomSheet {
         this.chatId = chatId;
         this.permanent = permanent;
         this.isChannel = isChannel;
-        fixNavigationBar(getThemedColor(Theme.key_graySection));
+        setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        fixNavigationBarKey(Theme.key_windowBackgroundGray);
+        fixedNavBarColor = navBarColor;
+        behindKeyboardColorKey = -1;
 
         if (this.users == null) {
             this.users = new HashMap<>();
@@ -177,11 +182,9 @@ public class InviteLinkBottomSheet extends BottomSheet {
             @Override
             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 int height = MeasureSpec.getSize(heightMeasureSpec);
-                if (Build.VERSION.SDK_INT >= 21) {
-                    ignoreLayout = true;
-                    setPadding(backgroundPaddingLeft, AndroidUtilities.statusBarHeight, backgroundPaddingLeft, 0);
-                    ignoreLayout = false;
-                }
+                ignoreLayout = true;
+                setPadding(backgroundPaddingLeft, AndroidUtilities.statusBarHeight, backgroundPaddingLeft, 0);
+                ignoreLayout = false;
                 super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
                 fullHeight = true;
             }
@@ -206,24 +209,22 @@ public class InviteLinkBottomSheet extends BottomSheet {
                 int height = getMeasuredHeight() + dp(36) + backgroundPaddingTop;
                 int statusBarHeight = 0;
                 float radProgress = 1.0f;
-                if (Build.VERSION.SDK_INT >= 21) {
-                    top += AndroidUtilities.statusBarHeight;
-                    height -= AndroidUtilities.statusBarHeight;
+                top += AndroidUtilities.statusBarHeight;
+                height -= AndroidUtilities.statusBarHeight;
 
-                    if (fullHeight) {
-                        if (top + backgroundPaddingTop < AndroidUtilities.statusBarHeight * 2) {
-                            int diff = Math.min(AndroidUtilities.statusBarHeight, AndroidUtilities.statusBarHeight * 2 - top - backgroundPaddingTop);
-                            top -= diff;
-                            height += diff;
-                            radProgress = 1.0f - Math.min(1.0f, (diff * 2) / (float) AndroidUtilities.statusBarHeight);
-                        }
-                        if (top + backgroundPaddingTop < AndroidUtilities.statusBarHeight) {
-                            statusBarHeight = Math.min(AndroidUtilities.statusBarHeight, AndroidUtilities.statusBarHeight - top - backgroundPaddingTop);
-                        }
+                if (fullHeight) {
+                    if (top + backgroundPaddingTop < AndroidUtilities.statusBarHeight * 2) {
+                        int diff = Math.min(AndroidUtilities.statusBarHeight, AndroidUtilities.statusBarHeight * 2 - top - backgroundPaddingTop);
+                        top -= diff;
+                        height += diff;
+                        radProgress = 1.0f - Math.min(1.0f, (diff * 2) / (float) AndroidUtilities.statusBarHeight);
+                    }
+                    if (top + backgroundPaddingTop < AndroidUtilities.statusBarHeight) {
+                        statusBarHeight = Math.min(AndroidUtilities.statusBarHeight, AndroidUtilities.statusBarHeight - top - backgroundPaddingTop);
                     }
                 }
 
-                shadowDrawable.setBounds(0, top, getMeasuredWidth(), height);
+                shadowDrawable.setBounds(0, top, getMeasuredWidth(), height + dp(10) + AndroidUtilities.navigationBarHeight);
                 shadowDrawable.draw(canvas);
 
                 if (radProgress != 1.0f) {
@@ -297,6 +298,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
                 super.onMeasure(widthSpec, heightSpec);
             }
         };
+        listView.setSections();
         listView.setTag(14);
         LinearLayoutManager layoutManager = new LinearLayoutManager(getContext(), LinearLayoutManager.VERTICAL, false);
         listView.setLayoutManager(layoutManager);
@@ -427,6 +429,49 @@ public class InviteLinkBottomSheet extends BottomSheet {
         updateColors();
     }
 
+    private int fixedNavBarColor;
+
+    @Override
+    public void onThemeColorsChanged() {
+        super.onThemeColorsChanged();
+        try {
+            final int color = getThemedColor(Theme.key_windowBackgroundGray);
+            if (shadowDrawable != null) {
+                setBackgroundColor(color);
+            }
+            if (navBarColorKey < 0 && navBarColor == fixedNavBarColor && color != navBarColor) {
+                fixedNavBarColor = navBarColor = color;
+                setOverlayNavBarColor(color);
+            }
+            applyThemeColors();
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    // theme switch part of updateColors(): views not covered by bindings / Theme.Colorable cells (no cell rebinding)
+    private void applyThemeColors() {
+        try {
+            if (titleTextView != null) {
+                titleTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+                titleTextView.setLinkTextColor(Theme.getColor(Theme.key_dialogTextLink));
+                titleTextView.setHighlightColor(Theme.getColor(Theme.key_dialogLinkSelection));
+                if (!titleVisible) {
+                    titleTextView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                }
+            }
+            if (listView != null) {
+                listView.setGlowColor(Theme.getColor(Theme.key_dialogScrollGlow));
+            }
+            if (shadow != null) {
+                shadow.setBackgroundColor(Theme.getColor(Theme.key_dialogShadowLine));
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+
     public void updateColors() {
         if (titleTextView != null) {
             titleTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
@@ -438,7 +483,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
         }
         listView.setGlowColor(Theme.getColor(Theme.key_dialogScrollGlow));
         shadow.setBackgroundColor(Theme.getColor(Theme.key_dialogShadowLine));
-        setBackgroundColor(Theme.getColor(Theme.key_dialogBackground));
+        setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
 
 
         int count = listView.getHiddenChildCount();
@@ -472,28 +517,9 @@ public class InviteLinkBottomSheet extends BottomSheet {
         } else if (view instanceof LinkActionView) {
             ((LinkActionView) view).updateColors();
         } else if (view instanceof TextInfoPrivacyCell) {
-            CombinedDrawable combinedDrawable = new CombinedDrawable(new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray)), Theme.getThemedDrawableByKey(view.getContext(), R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
-            combinedDrawable.setFullsize(true);
-            view.setBackground(combinedDrawable);
-            ((TextInfoPrivacyCell) view).setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+            ThemeBind.textColor(((TextInfoPrivacyCell) view).getTextView(), Theme.key_windowBackgroundWhiteGrayText4);
         } else if (view instanceof UserCell) {
             ((UserCell) view).update(0);
-        }
-        RecyclerView.ViewHolder holder = listView.getChildViewHolder(view);
-        if (holder != null) {
-            if (holder.getItemViewType() == 7) {
-                Drawable shadowDrawable = Theme.getThemedDrawableByKey(view.getContext(), R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow);
-                Drawable background = new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray));
-                CombinedDrawable combinedDrawable = new CombinedDrawable(background, shadowDrawable, 0, 0);
-                combinedDrawable.setFullsize(true);
-                view.setBackgroundDrawable(combinedDrawable);
-            } else if (holder.getItemViewType() == 2) {
-                Drawable shadowDrawable = Theme.getThemedDrawableByKey(view.getContext(), R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow);
-                Drawable background = new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray));
-                CombinedDrawable combinedDrawable = new CombinedDrawable(background, shadowDrawable, 0, 0);
-                combinedDrawable.setFullsize(true);
-                view.setBackgroundDrawable(combinedDrawable);
-            }
         }
     }
 
@@ -641,6 +667,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
                     break;
                 case 2:
                     view = new ShadowSectionCell(context, 12, Theme.getColor(Theme.key_windowBackgroundGray));
+                    ThemeBind.backgroundColor(view, Theme.key_windowBackgroundGray);
                     break;
                 case 3:
                     LinkActionView linkActionView = new LinkActionView(context, fragment, InviteLinkBottomSheet.this, chatId, false, isChannel) {
@@ -748,9 +775,6 @@ public class InviteLinkBottomSheet extends BottomSheet {
                     break;
                 case 4:
                     view = new TimerPrivacyCell(context);
-                    CombinedDrawable combinedDrawable = new CombinedDrawable(new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray)), Theme.getThemedDrawableByKey(context, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
-                    combinedDrawable.setFullsize(true);
-                    view.setBackground(combinedDrawable);
                     break;
                 case 5:
                     FlickerLoadingView flickerLoadingView = new FlickerLoadingView(context);
@@ -770,11 +794,6 @@ public class InviteLinkBottomSheet extends BottomSheet {
                     break;
                 case 7:
                     view = new ShadowSectionCell(context, 12);
-                    Drawable shadowDrawable = Theme.getThemedDrawableByKey(context, R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow);
-                    Drawable background = new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray));
-                    combinedDrawable = new CombinedDrawable(background, shadowDrawable, 0, 0);
-                    combinedDrawable.setFullsize(true);
-                    view.setBackgroundDrawable(combinedDrawable);
                     break;
                 case 8:
                     view = new EmptyHintRow(context);
@@ -920,7 +939,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
                     TimerPrivacyCell privacyCell = (TimerPrivacyCell) holder.itemView;
                     privacyCell.cancelTimer();
                     privacyCell.timer = false;
-                    privacyCell.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4));
+                    ThemeBind.textColor(privacyCell.getTextView(), Theme.key_windowBackgroundWhiteGrayText4);
                     privacyCell.setFixedSize(0);
                     if (invite.revoked) {
                         privacyCell.setText(LocaleController.getString(R.string.LinkIsNoActive));
@@ -929,7 +948,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
                             privacyCell.setText(LocaleController.getString(R.string.LinkIsExpiredLimitReached));
                         } else {
                             privacyCell.setText(LocaleController.getString(R.string.LinkIsExpired));
-                            privacyCell.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+                            ThemeBind.textColor(privacyCell.getTextView(), Theme.key_text_RedRegular);
                         }
                     } else if (invite.expire_date > 0) {
                         long currentTime = System.currentTimeMillis() + timeDif * 1000L;
@@ -1174,7 +1193,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
             super(context);
             textView = new TextView(context);
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteGrayText);
             textView.setGravity(Gravity.CENTER_HORIZONTAL);
             addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 60, 0, 60, 0));
         }
@@ -1209,13 +1228,13 @@ public class InviteLinkBottomSheet extends BottomSheet {
             layout.setOrientation(LinearLayout.VERTICAL);
 
             priceView = new TextView(context);
-            priceView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            ThemeBind.textColor(priceView, Theme.key_windowBackgroundWhiteBlackText);
             priceView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             priceView.setTypeface(AndroidUtilities.bold());
             layout.addView(priceView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT));
 
             periodView = new TextView(context);
-            periodView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2));
+            ThemeBind.textColor(periodView, Theme.key_windowBackgroundWhiteGrayText2);
             periodView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
             layout.addView(periodView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT, 0, 1, 0, 0));
 
@@ -1242,7 +1261,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
 
     }
 
-    private class RevenueCell extends FrameLayout {
+    private class RevenueCell extends FrameLayout implements Theme.Colorable {
 
         public final ImageView imageView;
         public final TextView titleView;
@@ -1261,12 +1280,12 @@ public class InviteLinkBottomSheet extends BottomSheet {
             titleView = new TextView(context);
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             titleView.setTypeface(AndroidUtilities.bold());
-            titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            ThemeBind.textColor(titleView, Theme.key_windowBackgroundWhiteBlackText);
             addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 72, 9, 0, 0));
 
             subtitleView = new TextView(context);
             subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            subtitleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            ThemeBind.textColor(subtitleView, Theme.key_windowBackgroundWhiteGrayText);
             addView(subtitleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 72, 32, 0, 0));
         }
 
@@ -1290,7 +1309,23 @@ public class InviteLinkBottomSheet extends BottomSheet {
             }
         }
 
-    }
+    
+        private int lastImageColor1, lastImageColor2;
+
+        @Override
+        public void updateColors() {
+            final int c1 = Theme.getColor(Theme.key_avatar_backgroundGreen);
+            final int c2 = Theme.getColor(Theme.key_avatar_background2Green);
+            if (imageView == null || (c1 == lastImageColor1 && c2 == lastImageColor2)) {
+                return;
+            }
+            lastImageColor1 = c1;
+            lastImageColor2 = c2;
+            // gradient circle: cannot be recolored in place, recreated only when its colors changed
+            imageView.setBackground(Theme.createCircleDrawable(46, c1, c2));
+            invalidate();
+        }
+}
 
     public static BottomSheet showSubscriptionSheet(
         Context context,
@@ -1333,6 +1368,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
 
         ImageView starBgView = new ImageView(context);
         starBgView.setImageDrawable(starBg);
+        ThemeBind.drawableColorFilter(starBgView, starBg, Theme.key_dialogBackground, resourcesProvider, PorterDuff.Mode.SRC_IN);
         topView.addView(starBgView, LayoutHelper.createFrame(28, 28, Gravity.CENTER));
         starBgView.setTranslationX(dp(34));
         starBgView.setTranslationY(dp(35));
@@ -1346,7 +1382,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
         starFgView.setTranslationY(dp(35));
 
         TextView textView = new TextView(context);
-        textView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+        ThemeBind.textColor(textView, Theme.key_dialogTextBlack, resourcesProvider);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         textView.setTypeface(AndroidUtilities.bold());
         textView.setGravity(Gravity.CENTER);
@@ -1356,7 +1392,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
         textView = new TextView(context);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         textView.setGravity(Gravity.CENTER);
-        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4, resourcesProvider));
+        ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteGrayText4, resourcesProvider);
         if (pricing.period == StarsController.PERIOD_MONTHLY) {
             textView.setText(StarsIntroActivity.replaceStarsWithPlain(formatString(R.string.StarsSubscriptionPrice, pricing.amount), .8f));
         } else {
@@ -1368,7 +1404,7 @@ public class InviteLinkBottomSheet extends BottomSheet {
         textView = new TextView(context);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         textView.setGravity(Gravity.CENTER);
-        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText4, resourcesProvider));
+        ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteGrayText4, resourcesProvider);
         if (pricing.period == StarsController.PERIOD_MONTHLY) {
             textView.setText(formatString(R.string.StarsParticipantSubscriptionApproxMonth, BillingController.getInstance().formatCurrency((int) (pricing.amount / 1000.0 * MessagesController.getInstance(currentAccount).starsUsdWithdrawRate1000), "USD")));
         } else {
@@ -1381,8 +1417,8 @@ public class InviteLinkBottomSheet extends BottomSheet {
         textView = new LinkSpanDrawable.LinksTextView(context, resourcesProvider);
         textView.setPadding(dp(12.66f), dp(9.33f), dp(12.66f), dp(9.33f));
         textView.setEllipsize(TextUtils.TruncateAt.END);
-        textView.setTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
-        textView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+        ThemeBind.textColor(textView, Theme.key_chat_messageLinkIn, resourcesProvider);
+        ThemeBind.linkTextColor(textView, Theme.key_chat_messageLinkIn, resourcesProvider);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         textView.setSingleLine(true);
         ((LinkSpanDrawable.LinksTextView) textView).setDisablePaddingsOffsetY(true);
@@ -1429,8 +1465,8 @@ public class InviteLinkBottomSheet extends BottomSheet {
         linearLayout.addView(tableView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 17, 0, 0));
 
         textView = new LinkSpanDrawable.LinksTextView(context, resourcesProvider);
-        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2, resourcesProvider));
-        textView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+        ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteGrayText2, resourcesProvider);
+        ThemeBind.linkTextColor(textView, Theme.key_chat_messageLinkIn, resourcesProvider);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         textView.setText(AndroidUtilities.replaceSingleTag(getString(R.string.StarsTransactionTOS), () -> {
             Browser.openUrl(context, getString(R.string.StarsTOSLink));

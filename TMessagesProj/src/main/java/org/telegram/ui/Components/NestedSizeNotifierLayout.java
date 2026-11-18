@@ -1,7 +1,5 @@
 package org.telegram.ui.Components;
 
-import static org.telegram.messenger.AndroidUtilities.dp;
-
 import android.content.Context;
 import android.view.View;
 
@@ -12,8 +10,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.ui.ActionBar.BottomSheet;
-import org.telegram.ui.CachedMediaLayout;
 
+@Deprecated
 public class NestedSizeNotifierLayout extends SizeNotifierFrameLayout implements NestedScrollingParent3, View.OnLayoutChangeListener {
     public NestedSizeNotifierLayout(Context context) {
         super(context);
@@ -25,7 +23,7 @@ public class NestedSizeNotifierLayout extends SizeNotifierFrameLayout implements
     ChildLayout childLayout;
     BottomSheet.ContainerView bottomSheetContainerView;
 
-    int maxTop;
+    int maxTop, maxTopPadding;
     boolean attached;
 
     private boolean childAttached() {
@@ -40,8 +38,8 @@ public class NestedSizeNotifierLayout extends SizeNotifierFrameLayout implements
 
     private void updateMaxTop() {
         if (targetListView != null && childLayout != null) {
-            if (childLayout instanceof CachedMediaLayout) {
-                maxTop = targetListView.getPaddingTop() + dp(12 + 12 + 16);
+            if (maxTopPadding != 0) {
+                maxTop = targetListView.getPaddingTop() + maxTopPadding;
             } else {
                 maxTop = targetListView.getMeasuredHeight() - targetListView.getPaddingBottom() - childLayout.getMeasuredHeight();
             }
@@ -128,13 +126,17 @@ public class NestedSizeNotifierLayout extends SizeNotifierFrameLayout implements
     }
 
     public void setChildLayout(ChildLayout childLayout) {
+        setChildLayout(childLayout, 0);
+    }
+    public void setChildLayout(ChildLayout childLayout, int maxTopPadding) {
+        this.maxTopPadding = maxTopPadding;
         if (this.childLayout != childLayout) {
             this.childLayout = childLayout;
             if (attached && childLayout != null && childLayout.getListView() != null) {
                 childLayout.getListView().addOnLayoutChangeListener(this);
             }
-            updateMaxTop();
         }
+        updateMaxTop();
     }
 
     @Override

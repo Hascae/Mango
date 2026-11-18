@@ -15,6 +15,7 @@ import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_forum;
+import org.telegram.tgnet.tl.TL_update;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Components.Forum.ForumUtilities;
@@ -306,6 +307,30 @@ public class TopicsController extends BaseController {
                             getMessagesStorage().updateTopicData(-chatId, newTopic, TOPIC_FLAG_CLOSE);
                             changed = true;
                         }
+                        if (!fromCache && oldTopic.pinned != newTopic.pinned) {
+                            oldTopic.pinned = newTopic.pinned;
+                            changed = true;
+                        }
+                        if (!fromCache) {
+                            int updateFlags = 0;
+                            if (!TextUtils.equals(oldTopic.title, newTopic.title)) {
+                                oldTopic.title = newTopic.title;
+                                updateFlags |= TOPIC_FLAG_TITLE;
+                            }
+                            if (oldTopic.icon_emoji_id != newTopic.icon_emoji_id || oldTopic.icon_color != newTopic.icon_color) {
+                                oldTopic.icon_emoji_id = newTopic.icon_emoji_id;
+                                oldTopic.icon_color = newTopic.icon_color;
+                                updateFlags |= TOPIC_FLAG_ICON;
+                            }
+                            if (oldTopic.hidden != newTopic.hidden) {
+                                oldTopic.hidden = newTopic.hidden;
+                                updateFlags |= TOPIC_FLAG_HIDE;
+                            }
+                            if (updateFlags != 0) {
+                                getMessagesStorage().updateTopicData(-chatId, newTopic, updateFlags);
+                                changed = true;
+                            }
+                        }
                     }
                 }
             }
@@ -583,6 +608,35 @@ public class TopicsController extends BaseController {
         }));
     }
 
+    /** The forum's topics matching the query on the server, also the ones not loaded yet; they are kept like the loaded ones. */
+    public int searchTopics(long chatId, String query, Utilities.Callback<ArrayList<TLRPC.TL_forumTopic>> onResult) {
+        final TL_forum.TL_messages_getForumTopics req = new TL_forum.TL_messages_getForumTopics();
+        req.peer = getMessagesController().getInputPeer(-chatId);
+        req.q = query;
+        req.limit = 50;
+        return getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+            final ArrayList<TLRPC.TL_forumTopic> result = new ArrayList<>();
+            if (response instanceof TLRPC.TL_messages_forumTopics) {
+                final TLRPC.TL_messages_forumTopics topics = (TLRPC.TL_messages_forumTopics) response;
+                final LongSparseArray<TLRPC.Message> messagesMap = new LongSparseArray<>();
+                for (int i = 0; i < topics.messages.size(); i++) {
+                    messagesMap.put(topics.messages.get(i).id, topics.messages.get(i));
+                }
+                getMessagesController().putUsers(topics.users, false);
+                getMessagesController().putChats(topics.chats, false);
+
+                processTopics(chatId, topics.topics, messagesMap, false, LOAD_TYPE_LOAD_UNKNOWN, -1);
+                getMessagesStorage().saveTopics(-chatId, topicsByChatId.get(chatId), true, true, getConnectionsManager().getCurrentTime());
+                getMessagesStorage().putMessages(topics.messages, false, true, false, 0, false, 0, 0);
+                for (TLRPC.TL_forumTopic topic : topics.topics) {
+                    final TLRPC.TL_forumTopic kept = findTopic(chatId, topic.id);
+                    result.add(kept != null ? kept : topic);
+                }
+            }
+            onResult.run(result);
+        }));
+    }
+
     public void updateMaxReadId(long chatId, long topicId, int readMaxId, int unreadCount, int mentionsUnread) {
         TLRPC.TL_forumTopic topic = findTopic(chatId, topicId);
         if (topic != null) {
@@ -646,7 +700,7 @@ public class TopicsController extends BaseController {
         return null;
     }
 
-    private final static int[] countsTmp = new int[4];
+    private final static int[] countsTmp = new int[5];
 
     public int[] getForumUnreadCount(long chatId) {
         ArrayList<TLRPC.TL_forumTopic> topics = topicsByChatId.get(chatId);
@@ -660,6 +714,7 @@ public class TopicsController extends BaseController {
                 if (!getMessagesController().isDialogMuted(-chatId, topic.id)) {
                     countsTmp[3] += topic.unread_count;
                 }
+                countsTmp[4] += topic.unread_poll_votes_count;
 
             }
         }
@@ -698,6 +753,33 @@ public class TopicsController extends BaseController {
     public void onTopicEdited(long dialogId, TLRPC.TL_forumTopic forumTopic) {
         getMessagesStorage().updateTopicData(dialogId, forumTopic, TOPIC_FLAG_ICON + TOPIC_FLAG_TITLE + TOPIC_FLAG_HIDE);
         sortTopics(-dialogId);
+    }
+
+    public void onTopicEditedServerSide(long dialogId, TL_update.TL_updateEditForumTopic update) {
+        final TLRPC.TL_forumTopic forumTopic = new TLRPC.TL_forumTopic();
+        forumTopic.id = update.topic_id;
+        int flags = 0;
+        if ((update.flags & 1) != 0) {
+            forumTopic.title = update.title;
+            flags |= TOPIC_FLAG_TITLE;
+        }
+        if ((update.flags & 2) != 0) {
+            forumTopic.icon_emoji_id = update.icon_emoji_id;
+            flags |= TOPIC_FLAG_ICON;
+        }
+        if ((update.flags & 4) != 0) {
+            forumTopic.closed = update.closed;
+            flags |= TOPIC_FLAG_CLOSE;
+        }
+        if ((update.flags & 8) != 0) {
+            forumTopic.hidden = update.hidden;
+            flags |= TOPIC_FLAG_HIDE;
+        }
+        if (flags == 0) {
+            return;
+        }
+        updateTopicInUi(dialogId, forumTopic, flags);
+        getMessagesStorage().updateTopicData(dialogId, forumTopic, flags);
     }
 
     public void deleteTopics(long chatId, ArrayList<Integer> topicIds) {
@@ -885,7 +967,7 @@ public class TopicsController extends BaseController {
                         fragment.showDialog(
                             new AlertDialog.Builder(fragment.getContext())
                                 .setTitle(LocaleController.getString(R.string.LimitReached))
-                                .setMessage(LocaleController.formatString("LimitReachedPinnedTopics", R.string.LimitReachedPinnedTopics, MessagesController.getInstance(currentAccount).topicsPinnedLimit))
+                                .setMessage(LocaleController.formatString(R.string.LimitReachedPinnedTopics, MessagesController.getInstance(currentAccount).topicsPinnedLimit))
                                 .setPositiveButton(LocaleController.getString(R.string.OK), null)
                                 .create()
                         );
@@ -936,10 +1018,36 @@ public class TopicsController extends BaseController {
         return totalCount;
     }
 
+    public int updatePollVotesUnread(long dialogId, long topicId, int count, boolean increment) {
+        TLRPC.TL_forumTopic topic = findTopic(-dialogId, topicId);
+        int totalCount = -1;
+        if (topic != null) {
+            if (increment) {
+                topic.unread_poll_votes_count += count;
+                if (topic.unread_poll_votes_count < 0) {
+                    topic.unread_poll_votes_count = 0;
+                }
+            } else {
+                topic.unread_poll_votes_count = count;
+            }
+            totalCount = topic.unread_poll_votes_count;
+            sortTopics(-dialogId, true);
+        }
+        return totalCount;
+    }
+
     public void markAllReactionsAsRead(long chatId, long topicId) {
         TLRPC.TL_forumTopic topic = findTopic(chatId, topicId);
         if (topic != null && topic.unread_reactions_count > 0) {
             topic.unread_reactions_count = 0;
+            sortTopics(chatId);
+        }
+    }
+
+    public void markAllPollVotesAsRead(long chatId, long topicId) {
+        TLRPC.TL_forumTopic topic = findTopic(chatId, topicId);
+        if (topic != null && topic.unread_poll_votes_count > 0) {
+            topic.unread_poll_votes_count = 0;
             sortTopics(chatId);
         }
     }
@@ -953,6 +1061,20 @@ public class TopicsController extends BaseController {
                     continue;
                 }
                 topic.unread_reactions_count = 0;
+            }
+            sortTopics(chatId);
+        }
+    }
+
+    public void markAllPollVotesAsRead(long chatId) {
+        ArrayList<TLRPC.TL_forumTopic> topics = getTopics(chatId);
+        if (topics != null) {
+            for (int i = 0; i < topics.size(); ++i) {
+                TLRPC.TL_forumTopic topic = topics.get(i);
+                if (topic == null) {
+                    continue;
+                }
+                topic.unread_poll_votes_count = 0;
             }
             sortTopics(chatId);
         }

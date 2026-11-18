@@ -30,3 +30,4 @@ google-services.json
 # Python cache
 __pycache__/
 *.pyc
+TMessagesProj/jni/ffmpeg/build_android

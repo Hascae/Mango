@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.telegram.build-app-plugin'
 
 def abiVersionCodes = [bundleAfat: 1, bundleAfat_SDK23: 2, afat: 9]
 
@@ -26,7 +27,6 @@ android {
 
     defaultConfig.applicationId = APP_PACKAGE
 
-    sourceSets.main.jniLibs.srcDirs = ['../TMessagesProj/jni/']
 
     lint {
         disable += ['MissingTranslation', 'ExtraTranslation', 'BlockedPrivateApi']
@@ -37,6 +37,11 @@ android {
         targetCompatibility JavaVersion.VERSION_17
 
         coreLibraryDesugaringEnabled = true
+    }
+
+    androidResources {
+        noCompress += "pack"
+        localeFilters += ["zz"]
     }
 
     signingConfigs {
@@ -55,6 +60,12 @@ android {
         }
     }
 
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
@@ -63,7 +74,7 @@ android {
             minifyEnabled false
             shrinkResources = false
             multiDexEnabled = true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro', '../TMessagesProj/proguard-rules-beta.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
         }
 
@@ -72,7 +83,7 @@ android {
             jniDebuggable false
             signingConfig = signingConfigs.release
             minifyEnabled true
-            shrinkResources = false
+            shrinkResources = true
             multiDexEnabled = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
@@ -83,7 +94,7 @@ android {
             jniDebuggable false
             signingConfig = signingConfigs.release
             minifyEnabled true
-            shrinkResources = false
+            shrinkResources = true
             multiDexEnabled = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
@@ -108,18 +119,6 @@ android {
         bundleAfat {
             ndk {
                 abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            }
-            buildConfigField "boolean", "BUNDLE", "true"
-        }
-        bundleAfat_SDK23 {
-            ndk {
-                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            }
-            sourceSets.debug {
-                manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
-            }
-            sourceSets.release {
-                manifest.srcFile '../TMessagesProj/config/release/AndroidManifest_SDK23.xml'
             }
             buildConfigField "boolean", "BUNDLE", "true"
         }
@@ -154,6 +153,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-24' // , '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                targets 'tmessages.49', 'twidget'
             }
         }
     }
