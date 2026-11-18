@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">프록시 연결</string>
     <string name="LocalHoldVerificationTitle">로컬 보류 인증</string>
     <string name="LocalHoldVerificationInfo">이 계정은 보류 제3자 인증을 통과했습니다.</string>
-    <string name="FeedbackSupportChannel">문제 피드백 고객 서비스 채널</string>
-    <string name="ContactSoftwareDeveloper">소프트웨어 개발자에게 문의</string>
     <string name="ExtensionFeatures">확장 센터</string>
     <string name="ExtensionFeaturesInfo">오른쪽 상단 모서리에 있는 세 개의 점에 있는 바로가기 스위치는 그대로 유지되며 여기에 통합 설정 입구가 제공됩니다.</string>
     <string name="DeviceInfoTitle">장치 정보</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">캐시 파일이 삭제되었습니다.</string>
     <string name="CachedFileDeleteFailed">삭제할 ​​수 있는 캐시 파일이 없습니다.</string>
     <string name="SaveStickerToGallery">사진 앨범에 이모티콘 저장</string>
-    <string name="AccountCancellationBot">계정 취소</string>
     <string name="UnlimitedChannelJoinTitle">채널 추가 상한선 돌파</string>
     <string name="UnlimitedChannelJoinInfo">는 기본적으로 활성화되어 있습니다. 클라이언트는 로컬 가입 채널 제한 프롬프트를 줄이지만 텔레그램 서버에서 반환한 실제 제한은 여전히 ​​적용될 수 있습니다.</string>
     <string name="UnlimitedDialogFiltersTitle">그룹화 제한을 돌파합니다.</string>

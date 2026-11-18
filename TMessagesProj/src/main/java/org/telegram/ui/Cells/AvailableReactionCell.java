@@ -15,14 +15,17 @@ import androidx.core.content.ContextCompat;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DocumentObject;
+import org.telegram.messenger.Emoji;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SvgHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.CheckBox2;
 import org.telegram.ui.Components.LayoutHelper;
@@ -44,7 +47,8 @@ public class AvailableReactionCell extends FrameLayout {
         this.canLock = canLock;
 
         textView = new SimpleTextView(context);
-        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        NotificationCenter.listenEmojiLoading(textView);
+        ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteBlackText);
         textView.setTextSize(16);
         textView.setTypeface(AndroidUtilities.bold());
         textView.setMaxLines(1);
@@ -90,14 +94,14 @@ public class AvailableReactionCell extends FrameLayout {
             animated = true;
         }
         this.react = react;
-        textView.setText(react.title);
+        textView.setText(Emoji.replaceEmoji(react.title, textView.getPaint().getFontMetricsInt(), false));
         SvgHelper.SvgDrawable svgThumb = DocumentObject.getSvgThumb(react.static_icon, Theme.key_windowBackgroundGray, 1.0f);
         imageView.setImage(ImageLocation.getForDocument(react.activate_animation), ReactionsUtils.ACTIVATE_ANIMATION_FILTER, "tgs", svgThumb, react);
 
         locked = canLock && react.premium && !UserConfig.getInstance(currentAccount).isPremium();
         if (locked) {
             Drawable drawable = ContextCompat.getDrawable(getContext(), R.drawable.other_lockedfolders2);
-            drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_stickers_menu), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.drawableColorFilter(this, drawable, Theme.key_stickers_menu, PorterDuff.Mode.MULTIPLY);
             textView.setRightDrawable(drawable);
 
         } else {
@@ -141,7 +145,6 @@ public class AvailableReactionCell extends FrameLayout {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        canvas.drawColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         float w = Theme.dividerPaint.getStrokeWidth();
         int l = 0, r = 0;
         int pad = AndroidUtilities.dp(81);

@@ -5,6 +5,7 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
 import android.graphics.Path;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -21,6 +22,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.LocaleController;
@@ -30,13 +32,16 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.TLMethod;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.tl.TL_ephemeral;
 import org.telegram.tgnet.tl.TL_stories;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Cells.EditTextCell;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Components.AnimatedFloat;
@@ -54,7 +59,6 @@ import org.telegram.ui.Components.ViewPagerFixed;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 
@@ -64,8 +68,30 @@ public class ReportBottomSheet extends BottomSheet {
     private static final int PAGE_TYPE_OPTIONS = 0;
     private static final int PAGE_TYPE_SUB_OPTIONS = 1;
     private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private int fixedNavBarColor;
+
+    @Override
+    public void onThemeColorsChanged() {
+        super.onThemeColorsChanged();
+        try {
+            final int color = Theme.getColor(Theme.key_dialogBackground, resourcesProvider);
+            if (backgroundPaint.getColor() != color) {
+                backgroundPaint.setColor(color);
+                if (containerView != null) {
+                    containerView.invalidate();
+                }
+            }
+            if (navBarColorKey < 0 && navBarColor == fixedNavBarColor && color != navBarColor) {
+                fixedNavBarColor = navBarColor = color;
+                setOverlayNavBarColor(color);
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
     private final boolean sponsored;
     private final boolean stories;
+    private final boolean ephemeral;
     private final ArrayList<Integer> messageIds;
     private final byte[] sponsoredId;
     private final long dialogId;
@@ -117,46 +143,38 @@ public class ReportBottomSheet extends BottomSheet {
     }
 
     interface Listener {
-        default void onReported() {};
-        default void onHidden() {};
-        default void onPremiumRequired() {};
+        default void onReported() {}
+        default void onHidden() {}
+        default void onPremiumRequired() {}
     }
 
-    public ReportBottomSheet(
+    private ReportBottomSheet(
         Context context,
         Theme.ResourcesProvider resourcesProvider,
         boolean stories,
-        long dialogId,
-        int messageId
-    ) {
-        this(context, resourcesProvider, stories, dialogId, new ArrayList<>(Arrays.asList(messageId)));
-    }
-
-    public ReportBottomSheet(
-        Context context,
-        Theme.ResourcesProvider resourcesProvider,
-        boolean stories,
+        boolean ephemeral,
         long dialogId,
         ArrayList<Integer> messageIds
     ) {
-        this(false, context, resourcesProvider, dialogId, stories, messageIds, null);
+        this(false, context, resourcesProvider, dialogId, stories, ephemeral, messageIds, null);
     }
 
-    public ReportBottomSheet(
+    private ReportBottomSheet(
         Context context,
         Theme.ResourcesProvider resourcesProvider,
         long dialogId,
         byte[] sponsoredId
     ) {
-        this(true, context, resourcesProvider, dialogId, false, null, sponsoredId);
+        this(true, context, resourcesProvider, dialogId, false, false, null, sponsoredId);
     }
 
-    public ReportBottomSheet(
+    private ReportBottomSheet(
         final boolean sponsored,
         Context context,
         Theme.ResourcesProvider resourcesProvider,
         long dialogId,
         boolean stories,
+        boolean ephemeral,
         ArrayList<Integer> messageIds,
         byte[] sponsoredId
     ) {
@@ -164,10 +182,12 @@ public class ReportBottomSheet extends BottomSheet {
         this.sponsored = sponsored;
         this.messageIds = messageIds;
         this.stories = stories;
+        this.ephemeral = ephemeral;
         this.sponsoredId = sponsoredId;
         this.dialogId = dialogId;
         backgroundPaint.setColor(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
-        fixNavigationBar(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
+        fixNavigationBarKey(Theme.key_dialogBackground);
+        fixedNavBarColor = navBarColor;
         smoothKeyboardAnimationEnabled = true;
         smoothKeyboardByBottom = true;
         containerView = new ContainerView(context);
@@ -231,7 +251,7 @@ public class ReportBottomSheet extends BottomSheet {
         }
     }
 
-    public ReportBottomSheet setReportChooseOption(TLRPC.TL_channels_sponsoredMessageReportResultChooseOption chooseOption) {
+    private ReportBottomSheet setReportChooseOption(TLRPC.TL_channels_sponsoredMessageReportResultChooseOption chooseOption) {
         View[] viewPages = viewPager.getViewPages();
         if (viewPages[0] instanceof Page) {
             ((Page) viewPages[0]).bind(PAGE_TYPE_OPTIONS);
@@ -243,7 +263,7 @@ public class ReportBottomSheet extends BottomSheet {
         return this;
     }
 
-    public ReportBottomSheet setReportChooseOption(TLRPC.TL_reportResultChooseOption chooseOption) {
+    private ReportBottomSheet setReportChooseOption(TLRPC.TL_reportResultChooseOption chooseOption) {
         View[] viewPages = viewPager.getViewPages();
         if (viewPages[0] instanceof Page) {
             ((Page) viewPages[0]).bind(PAGE_TYPE_OPTIONS);
@@ -255,7 +275,7 @@ public class ReportBottomSheet extends BottomSheet {
         return this;
     }
 
-    public ReportBottomSheet setReportChooseOption(TLRPC.TL_reportResultAddComment chooseOption) {
+    private ReportBottomSheet setReportChooseOption(TLRPC.TL_reportResultAddComment chooseOption) {
         View[] viewPages = viewPager.getViewPages();
         if (viewPages[0] instanceof Page) {
             ((Page) viewPages[0]).bind(PAGE_TYPE_OPTIONS);
@@ -267,7 +287,7 @@ public class ReportBottomSheet extends BottomSheet {
         return this;
     }
 
-    public ReportBottomSheet setListener(Listener listener) {
+    private ReportBottomSheet setListener(Listener listener) {
         this.listener = listener;
         return this;
     }
@@ -308,6 +328,15 @@ public class ReportBottomSheet extends BottomSheet {
             req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
             if (messageIds != null) {
                 req.id.addAll(messageIds);
+            }
+            req.message = comment == null ? "" : comment;
+            req.option = option;
+            request = req;
+        } else if (ephemeral) {
+            TL_ephemeral.TL_reportMessage req = new TL_ephemeral.TL_reportMessage();
+            req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
+            if (messageIds != null && !messageIds.isEmpty()) {
+                req.id = messageIds.get(0);
             }
             req.message = comment == null ? "" : comment;
             req.option = option;
@@ -454,8 +483,19 @@ public class ReportBottomSheet extends BottomSheet {
         }
     }
 
-    private class Page extends FrameLayout {
+    private class Page extends FrameLayout implements Theme.Colorable {
         int pageType;
+
+        @Override
+        public void updateColors() {
+            try {
+                if (headerView != null && headerView.backDrawable != null) {
+                    headerView.backDrawable.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
 
         TLRPC.TL_channels_sponsoredMessageReportResultChooseOption sponsoredOption;
         TLRPC.TL_reportResultChooseOption option;
@@ -489,7 +529,7 @@ public class ReportBottomSheet extends BottomSheet {
                 headerView.setText(LocaleController.getString(R.string.Report2));
             }
             headerView.backDrawable.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
-            headerView.setBackgroundColor(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
+            ThemeBind.backgroundColor(headerView, Theme.key_dialogBackground, resourcesProvider);
             addView(headerView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.FILL_HORIZONTAL));
 
             listView = new UniversalRecyclerView(context, currentAccount, 0, true, this::fillItems, this::onClick, null, resourcesProvider);
@@ -601,7 +641,7 @@ public class ReportBottomSheet extends BottomSheet {
                     } else if (option != null) {
                         headerCell.setText(localizeReportText(option.title));
                     }
-                    headerCell.setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+                    ThemeBind.backgroundColor(headerCell, Theme.key_dialogBackground, ReportBottomSheet.this.resourcesProvider);
                     UItem headerItem = UItem.asCustom(headerCell);
                     headerItem.id = -2;
                     items.add(headerItem);
@@ -660,11 +700,11 @@ public class ReportBottomSheet extends BottomSheet {
                         button.setText(LocaleController.getString(R.string.Report2Send), false);
 
                         buttonContainer = new FrameLayout(getContext());
-                        buttonContainer.setBackgroundColor(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
+                        ThemeBind.backgroundColor(buttonContainer, Theme.key_dialogBackground, resourcesProvider);
                         buttonContainer.addView(button, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.FILL, 12, 12, 12, 12));
 
                         View buttonShadow = new View(getContext());
-                        buttonShadow.setBackgroundColor(Theme.getColor(Theme.key_divider, resourcesProvider));
+                        ThemeBind.backgroundColor(buttonShadow, Theme.key_divider, resourcesProvider);
                         buttonContainer.addView(buttonShadow, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1f / AndroidUtilities.density, Gravity.TOP));
                     }
                     button.setEnabled(commentOption.optional || !TextUtils.isEmpty(editTextCell.getText()));
@@ -683,15 +723,17 @@ public class ReportBottomSheet extends BottomSheet {
 
                 if (sponsored && pageType == PAGE_TYPE_OPTIONS) {
                     FrameLayout frameLayout = new FrameLayout(getContext());
-                    Drawable shadowDrawable = Theme.getThemedDrawable(getContext(), R.drawable.greydivider, Theme.getColor(Theme.key_windowBackgroundGrayShadow, resourcesProvider));
-                    Drawable background = new ColorDrawable(getThemedColor(Theme.key_windowBackgroundGray));
+                    Drawable shadowDrawable = getContext().getResources().getDrawable(R.drawable.greydivider).mutate();
+                    ThemeBind.drawableColorFilter(frameLayout, shadowDrawable, Theme.key_windowBackgroundGrayShadow, resourcesProvider, PorterDuff.Mode.MULTIPLY);
+                    Drawable background = new ColorDrawable(0xFFFFFFFF);
+                    ThemeBind.drawableColorFilter(frameLayout, background, Theme.key_windowBackgroundGray, resourcesProvider, PorterDuff.Mode.SRC_IN);
                     CombinedDrawable combinedDrawable = new CombinedDrawable(background, shadowDrawable, 0, 0);
                     combinedDrawable.setFullsize(true);
                     frameLayout.setBackground(combinedDrawable);
                     LinkSpanDrawable.LinksTextView textView = new LinkSpanDrawable.LinksTextView(getContext());
                     textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
                     textView.setText(AndroidUtilities.replaceLinks(LocaleController.getString(R.string.ReportAdLearnMore), resourcesProvider));
-                    textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3, resourcesProvider));
+                    ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteGrayText3, resourcesProvider);
                     textView.setGravity(Gravity.CENTER);
                     frameLayout.addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 16, 16, 16, 16));
                     UItem bottomItem = UItem.asCustom(frameLayout);
@@ -749,7 +791,7 @@ public class ReportBottomSheet extends BottomSheet {
                 textView.setTypeface(AndroidUtilities.bold());
                 textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
                 textView.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
-                textView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                ThemeBind.textColor(textView, Theme.key_dialogTextBlack, resourcesProvider);
                 addView(textView);
 
                 btnBack = new ImageView(context);
@@ -798,7 +840,16 @@ public class ReportBottomSheet extends BottomSheet {
         Context context,
         long dialogId
     ) {
-        open(currentAccount, context, dialogId, false, new ArrayList<>(), null, null, new byte[]{}, null, null);
+        openChat(currentAccount, context, null, dialogId);
+    }
+
+    public static void openChat(
+        int currentAccount,
+        Context context,
+        BulletinFactory bulletinFactory,
+        long dialogId
+    ) {
+        open(currentAccount, context, dialogId, false, false, new ArrayList<>(), bulletinFactory, null, new byte[]{}, null, null);
     }
 
     public static void openChat(
@@ -810,7 +861,7 @@ public class ReportBottomSheet extends BottomSheet {
         final long dialogId = fragment.getDialogId();
         if (context == null) return;
 
-        open(currentAccount, context, dialogId, false, new ArrayList<>(), null, null, new byte[]{}, null, null);
+        open(currentAccount, context, dialogId, false, false, new ArrayList<>(), null, null, new byte[]{}, null, null);
     }
 
     public static void openChat(
@@ -822,7 +873,7 @@ public class ReportBottomSheet extends BottomSheet {
         final Context context = fragment.getContext();
         if (context == null) return;
 
-        open(currentAccount, context, dialogId, false, new ArrayList<>(), null, null, new byte[]{}, null, null);
+        open(currentAccount, context, dialogId, false, false, new ArrayList<>(), null, null, new byte[]{}, null, null);
     }
 
     public static void openMessage(
@@ -834,21 +885,8 @@ public class ReportBottomSheet extends BottomSheet {
         final Context context = fragment.getContext();
         if (context == null) return;
 
-        final ArrayList<Integer> messageIds = new ArrayList<>(Collections.singleton(message.getId()));
-        open(currentAccount, context,  message.getDialogId(), false, messageIds, BulletinFactory.of(fragment), fragment == null ? null : fragment.getResourceProvider(), new byte[]{}, null, null);
-    }
-
-    public static void openMessages(
-        ChatActivity fragment,
-        ArrayList<Integer> ids
-    ) {
-        if (fragment == null) return;
-        final int currentAccount = fragment.getCurrentAccount();
-        final Context context = fragment.getContext();
-        final long dialogId = fragment.getDialogId();
-        if (context == null) return;
-
-        open(currentAccount, context, dialogId, false, ids, BulletinFactory.of(fragment), fragment == null ? null : fragment.getResourceProvider(), new byte[]{}, null, null);
+        final ArrayList<Integer> messageIds = new ArrayList<>(Collections.singleton(message.isEphemeral() ? message.getEphemeralId() : message.getId()));
+        open(currentAccount, context,  message.getDialogId(), false, message.isEphemeral(), messageIds, BulletinFactory.of(fragment), fragment == null ? null : fragment.getResourceProvider(), new byte[]{}, null, null);
     }
 
     public static void continueReport(
@@ -864,7 +902,7 @@ public class ReportBottomSheet extends BottomSheet {
         final long dialogId = fragment.getDialogId();
         if (context == null) return;
 
-        open(currentAccount, context, dialogId, false, ids, BulletinFactory.of(fragment), fragment == null ? null : fragment.getResourceProvider(), option, message, whenDone);
+        open(currentAccount, context, dialogId, false, false, ids, BulletinFactory.of(fragment), fragment == null ? null : fragment.getResourceProvider(), option, message, whenDone);
     }
 
     public static void openStory(
@@ -876,14 +914,15 @@ public class ReportBottomSheet extends BottomSheet {
         Utilities.Callback<Boolean> whenDone
     ) {
         final ArrayList<Integer> storyIds = new ArrayList<>(Collections.singleton(storyItem.id));
-        open(currentAccount, context, storyItem.dialogId, true, storyIds, bulletinFactory, resourceProvider, new byte[]{}, null, whenDone);
+        open(currentAccount, context, storyItem.dialogId, true, false, storyIds, bulletinFactory, resourceProvider, new byte[]{}, null, whenDone);
     }
 
-    public static void open(
+    private static void open(
         int currentAccount,
         Context context,
         long dialogId,
         boolean stories,
+        boolean ephemeral,
         ArrayList<Integer> messageIds,
         BulletinFactory bulletinFactory,
         Theme.ResourcesProvider resourceProvider,
@@ -893,13 +932,22 @@ public class ReportBottomSheet extends BottomSheet {
     ) {
         if (context == null || messageIds == null) return;
         final boolean[] done = new boolean[] { false };
-        final TLObject request;
+        final TLMethod<TLRPC.ReportResult> request;
         if (stories) {
             TL_stories.TL_stories_report req = new TL_stories.TL_stories_report();
             req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
             req.id.addAll(messageIds);
             req.option = option;
             req.message = TextUtils.isEmpty(message) ? "" : message;
+            request = req;
+        } else if (ephemeral) {
+            TL_ephemeral.TL_reportMessage req = new TL_ephemeral.TL_reportMessage();
+            req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
+            if (!messageIds.isEmpty()) {
+                req.id = messageIds.get(0);
+            }
+            req.message = TextUtils.isEmpty(message) ? "" : message;
+            req.option = option;
             request = req;
         } else {
             TLRPC.TL_messages_report req = new TLRPC.TL_messages_report();
@@ -909,69 +957,65 @@ public class ReportBottomSheet extends BottomSheet {
             req.message = TextUtils.isEmpty(message) ? "" : message;
             request = req;
         }
-        ConnectionsManager.getInstance(currentAccount).sendRequest(request, (response, error) -> {
-            if (response != null) {
-                if (response instanceof TLRPC.TL_reportResultChooseOption || response instanceof TLRPC.TL_reportResultAddComment) {
-                    AndroidUtilities.runOnUIThread(() -> {
-                        final ReportBottomSheet sheet = new ReportBottomSheet(context, resourceProvider, stories, dialogId, messageIds);
-                        if (response instanceof TLRPC.TL_reportResultChooseOption) {
-                            sheet.setReportChooseOption((TLRPC.TL_reportResultChooseOption) response);
-                        } else if (response instanceof TLRPC.TL_reportResultAddComment) {
-                            sheet.setReportChooseOption((TLRPC.TL_reportResultAddComment) response);
-                        }
-                        sheet.setListener(new ReportBottomSheet.Listener() {
-                            @Override
-                            public void onReported() {
-                                if (!done[0] && whenDone != null) {
-                                    done[0] = true;
-                                    whenDone.run(true);
-                                }
-                                AndroidUtilities.runOnUIThread(() -> {
-                                    if (LaunchActivity.getSafeLastFragment() == null) return;
-                                    final BulletinFactory bf = bulletinFactory == null ? BulletinFactory.of(LaunchActivity.getSafeLastFragment()) : bulletinFactory;
-                                    if (bf == null) return;
-                                    bf
-                                        .createSimpleBulletin(
-                                            R.raw.msg_antispam,
-                                            LocaleController.getString(R.string.ReportChatSent),
-                                            LocaleController.getString(R.string.Reported2)
-                                        )
-                                        .setDuration(Bulletin.DURATION_PROLONG)
-                                        .show();
-                                }, 200);
-                            }
-                        });
-                        sheet.setOnDismissListener(() -> {
-                            if (!done[0] && whenDone != null) {
-                                done[0] = true;
-                                whenDone.run(false);
-                            }
-                        });
-                        sheet.show();
-                    });
-                } else if (response instanceof TLRPC.TL_reportResultReported) {
-                    AndroidUtilities.runOnUIThread(() -> {
+        ConnectionsManager.getInstance(currentAccount).sendRequestTyped(request, AndroidUtilities::runOnUIThread, (response, error) -> {
+            if (response instanceof TLRPC.TL_reportResultChooseOption || response instanceof TLRPC.TL_reportResultAddComment) {
+                final ReportBottomSheet sheet = new ReportBottomSheet(context, resourceProvider, stories, ephemeral, dialogId, messageIds);
+                if (response instanceof TLRPC.TL_reportResultChooseOption) {
+                    sheet.setReportChooseOption((TLRPC.TL_reportResultChooseOption) response);
+                } else if (response instanceof TLRPC.TL_reportResultAddComment) {
+                    sheet.setReportChooseOption((TLRPC.TL_reportResultAddComment) response);
+                }
+                sheet.setListener(new ReportBottomSheet.Listener() {
+                    @Override
+                    public void onReported() {
                         if (!done[0] && whenDone != null) {
                             done[0] = true;
                             whenDone.run(true);
                         }
-                        Runnable showToast = () -> {
-                            BaseFragment fragment = LaunchActivity.getSafeLastFragment();
-                            if (fragment == null) return;
-                            final BulletinFactory bf = BulletinFactory.of(fragment);
+                        AndroidUtilities.runOnUIThread(() -> {
+                            if (LaunchActivity.getSafeLastFragment() == null) return;
+                            final BulletinFactory bf = bulletinFactory == null ? BulletinFactory.of(LaunchActivity.getSafeLastFragment()) : bulletinFactory;
                             if (bf == null) return;
                             bf
                                 .createSimpleBulletin(
-                                        R.raw.msg_antispam,
-                                        LocaleController.getString(R.string.ReportChatSent),
-                                        LocaleController.getString(R.string.Reported2)
+                                    R.raw.msg_antispam,
+                                    LocaleController.getString(R.string.ReportChatSent),
+                                    LocaleController.getString(R.string.Reported2)
                                 )
                                 .setDuration(Bulletin.DURATION_PROLONG)
                                 .show();
-                        };
-                        AndroidUtilities.runOnUIThread(showToast, 220);
-                    }, 200);
-                }
+                        }, 200);
+                    }
+                });
+                sheet.setOnDismissListener(() -> {
+                    if (!done[0] && whenDone != null) {
+                        done[0] = true;
+                        whenDone.run(false);
+                    }
+                });
+                sheet.show();
+            } else if (response instanceof TLRPC.TL_reportResultReported || true) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (!done[0] && whenDone != null) {
+                        done[0] = true;
+                        whenDone.run(true);
+                    }
+                    Runnable showToast = () -> {
+                        BaseFragment fragment = LaunchActivity.getSafeLastFragment();
+                        if (fragment == null) return;
+                        final BulletinFactory bf = BulletinFactory.of(fragment);
+                        if (bf == null) return;
+                        bf
+                            .createSimpleBulletin(
+                                    R.raw.msg_antispam,
+                                    LocaleController.getString(R.string.ReportChatSent),
+                                    LocaleController.getString(R.string.Reported2)
+                            )
+                            .setDuration(Bulletin.DURATION_PROLONG)
+                            .show();
+                    };
+                    AndroidUtilities.runOnUIThread(showToast, 220);
+                }, 200);
             }
         });
     }

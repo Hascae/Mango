@@ -4,8 +4,13 @@ import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import org.telegram.tgnet.TLRPC;
+import org.telegram.utils.twidget.WidgetMedia;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class AppGlobalConfig {
@@ -57,6 +62,66 @@ public class AppGlobalConfig {
     public final ConfigBoolean disableBlurInDarkTheme = ofBoolean("android_disable_blur_in_dark_theme", false);
 
     public final ConfigTime noForwardsRequestExpirePeriod = ofTime("no_forwards_request_expire_period", 86400, TimeUnit.SECONDS);
+    public final ConfigTime pollClosePeriodMax = ofTime("poll_close_period_max", 86400 * 30, TimeUnit.SECONDS);
+
+    public final ConfigString musicSearchUsername = ofString("music_search_username", null);
+
+    public final ConfigInt pollAnswersMax = ofInt("poll_answers_max", 12);
+    public final ConfigInt pollCountriesMax = ofInt("poll_countries_max", 12);
+    public final ConfigInt pollAnswerLengthMax = ofInt("poll_answer_length_max", 100);
+    public final ConfigInt pollQuestionLengthMax = ofInt("poll_question_length_max", 255);
+    public final ConfigInt pollSolutionLengthMax = ofInt("poll_solution_length_max", 200);
+    public final ConfigInt pollCaptionLengthMax = ofInt("poll_caption_length_max", 300);
+
+    public final ConfigTime pollAnswerDeletePeriod = ofTime("poll_answer_delete_period", 300, TimeUnit.SECONDS);
+
+    public final ConfigInt botsCreateLimitDefault = ofInt("bots_create_limit_default", 20);
+    public final ConfigInt botsCreateLimitPremium = ofInt("bots_create_limit_premium", 40);
+    public final ConfigInt botAdditionalUsernamesLimit = ofInt("bot_additional_usernames_limit", 2);
+
+    public final ConfigString phoneCountryIso2 = ofString("phone_country_iso2", "en");
+
+    public final ConfigInt aicomposeToneExamplesNum = ofInt("aicompose_tone_examples_num", 3);
+    public final ConfigInt aicomposeToneTitleLengthMax = ofInt("aicompose_tone_title_length_max", 12);
+    public final ConfigInt aicomposeTonePromptLengthMax = ofInt("aicompose_tone_prompt_length_max", 1024);
+    public final ConfigInt aicomposeToneSavedLimitDefault = ofInt("aicompose_tone_saved_limit_default", 5);
+    public final ConfigInt aicomposeToneSavedLimitPremium = ofInt("aicompose_tone_saved_limit_premium", 20);
+
+    public final ConfigBoolean messagePrimaryEditedDate = ofBoolean("message_primary_edited_date", false);
+
+    public final ConfigInt richMessageLengthLimit = ofInt("rich_message_length_limit", 32_768);
+    public final ConfigInt richMessageMaxBlocks = ofInt("rich_message_max_blocks", 500);
+    public final ConfigInt richMessageMaxDepth = ofInt("rich_message_max_depth", 16);
+    public final ConfigInt richMessageMaxMedia = ofInt("rich_message_max_media", 50);
+    public final ConfigInt richMessageMaxTableCols = ofInt("rich_message_max_table_cols", 20);
+    public final ConfigString richMessagePosting = ofString("rich_message_posting", "premium");
+
+    public final ConfigInt communityPeersLimit = ofInt("community_peers_limit", 100);
+    public final ConfigInt communityBotPeersLimit = ofInt("community_bot_peers_limit", 100);
+
+    public final ConfigInt messageLengthLimitDefault = ofInt("message_length_limit_default", 4096);
+    public final ConfigInt messageLengthLimitPremium = ofInt("message_length_limit_premium", 8192);
+
+    public final ConfigInt quickReplyMessagesLimit = ofInt("quick_reply_messages_limit", 20);
+    public final ConfigInt ephemeralWelcomeMessagesMax = ofInt("ephemeral_welcome_messages_max", 5);
+
+    public final ConfigBoolean audioRecorderV2Disabled = ofBoolean("android_audio_recorder_v2_disabled", false);
+    public final ConfigBoolean roundVideoRecorderV2Disabled = ofBoolean("android_round_video_recorder_v2_disabled", false);
+
+    public final ConfigBoolean starsSpendTopUpInvoiceDisabled = ofBoolean("stars_spend_topup_invoice_disabled", false);
+
+    public final ConfigStringSet botAllowedSuffixes = ofStringSet("bot_allowed_suffixes", Collections.singleton("bot"));
+
+    public final ConfigBoolean walletAvailable = ofBoolean("wallet_available", BuildVars.DEBUG_VERSION);
+    public final ConfigBoolean walletPaidMessageRecipientMessageAmountCheck = ofBoolean("wallet_paid_message_recipient_message_amount_check", true);
+    public final ConfigLong walletTransferMinNanos = ofLong("wallet_transfer_min_nanos", 100_000_000);
+    public final ConfigLong walletGaslessMinNanos = ofLong("wallet_gasless_min_nanos", 100_000_000);
+    public final ConfigStringSet walletCardBgGifts = ofStringSet("wallet_card_bg_gifts", Collections.emptySet());
+    public final ConfigLongSet agentBotIds = ofLongSet("agent_bot_ids");
+
+    // Kill switch for message widgets (messageMediaWidget): true and the client runs no widget code at all
+    // (WidgetSandboxSession#disabledByConfig). Kept across restarts; turned back on only by an explicit false.
+    public final ConfigBoolean widgetsDisabled = ofBoolean("widgets_disabled", false);
 
     /* * */
 
@@ -71,6 +136,11 @@ public class AppGlobalConfig {
             }
 
             changed |= configHandler.apply(editor, value.value);
+        }
+
+        if (widgetsDisabled.get()) {
+            // The widgets running now stop at once; new ones never start.
+            WidgetMedia.onKillSwitch();
         }
 
         return changed;
@@ -263,6 +333,122 @@ public class AppGlobalConfig {
         }
     }
 
+    public static class ConfigStringSet {
+        private final Internal handler;
+
+        private ConfigStringSet(String name, Set<String> defaultValue) {
+            this.handler = new Internal(name, defaultValue);
+        }
+
+        public Set<String> get() {
+            return handler.value;
+        }
+
+        private static class Internal implements ConfigInternal {
+            private final String name;
+            private final Set<String> defaultValue;
+            private Set<String> value;
+
+            private Internal(String name, Set<String> defaultValue) {
+                this.name = name;
+                this.defaultValue = defaultValue == null ? null : new HashSet<>(defaultValue);
+            }
+
+            @Override
+            public boolean apply(SharedPreferences.Editor editor, TLRPC.JSONValue tlValue) {
+                if (tlValue instanceof TLRPC.TL_jsonArray) {
+                    TLRPC.TL_jsonArray array = (TLRPC.TL_jsonArray) tlValue;
+                    HashSet<String> newValue = new HashSet<>();
+                    for (int i = 0, N = array.value.size(); i < N; i++) {
+                        TLRPC.JSONValue item = array.value.get(i);
+                        if (item instanceof TLRPC.TL_jsonString) {
+                            newValue.add(((TLRPC.TL_jsonString) item).value);
+                        }
+                    }
+                    if (!newValue.equals(value)) {
+                        value = newValue;
+                        editor.putStringSet(name, new HashSet<>(value));
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public void load(SharedPreferences preferences) {
+                Set<String> stored = preferences.getStringSet(name, defaultValue);
+                value = stored == null ? null : new HashSet<>(stored);
+            }
+        }
+    }
+
+    public static class ConfigLongSet {
+        private final Internal handler;
+
+        private ConfigLongSet(String name) {
+            this.handler = new Internal(name);
+        }
+
+        public Set<Long> get() {
+            return handler.value;
+        }
+
+        public boolean contains(long id) {
+            return handler.value.contains(id);
+        }
+
+        private static class Internal implements ConfigInternal {
+            private final String name;
+            private Set<Long> value = Collections.emptySet();
+
+            private Internal(String name) {
+                this.name = name;
+            }
+
+            @Override
+            public boolean apply(SharedPreferences.Editor editor, TLRPC.JSONValue tlValue) {
+                if (tlValue instanceof TLRPC.TL_jsonArray) {
+                    TLRPC.TL_jsonArray array = (TLRPC.TL_jsonArray) tlValue;
+                    HashSet<Long> newValue = new HashSet<>();
+                    for (int i = 0, N = array.value.size(); i < N; i++) {
+                        TLRPC.JSONValue item = array.value.get(i);
+                        if (item instanceof TLRPC.TL_jsonNumber) {
+                            newValue.add((long) ((TLRPC.TL_jsonNumber) item).value);
+                        } else if (item instanceof TLRPC.TL_jsonString) {
+                            try {
+                                newValue.add(Long.parseLong(((TLRPC.TL_jsonString) item).value));
+                            } catch (NumberFormatException ignore) {}
+                        }
+                    }
+                    if (!newValue.equals(value)) {
+                        value = newValue;
+                        HashSet<String> stored = new HashSet<>();
+                        for (Long id : value) {
+                            stored.add(Long.toString(id));
+                        }
+                        editor.putStringSet(name, stored);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public void load(SharedPreferences preferences) {
+                Set<String> stored = preferences.getStringSet(name, null);
+                HashSet<Long> newValue = new HashSet<>();
+                if (stored != null) {
+                    for (String s : stored) {
+                        try {
+                            newValue.add(Long.parseLong(s));
+                        } catch (NumberFormatException ignore) {}
+                    }
+                }
+                value = newValue;
+            }
+        }
+    }
+
     public static class ConfigBoolean {
         private final Internal handler;
 
@@ -353,10 +539,28 @@ public class AppGlobalConfig {
         return config;
     }
 
+    private ConfigLongSet ofLongSet(String name) {
+        ConfigLongSet config = new ConfigLongSet(name);
+        map.put(name, config.handler);
+
+        return config;
+    }
+
+    private ConfigStringSet ofStringSet(String name, Set<String> defaultValue) {
+        ConfigStringSet config = new ConfigStringSet(name, defaultValue);
+        map.put(name, config.handler);
+
+        return config;
+    }
+
     private ConfigTime ofTime(String name, long defaultValue, TimeUnit timeUnit) {
         ConfigTime configInt = new ConfigTime(name, timeUnit, defaultValue);
         map.put(name, configInt.handler);
 
         return configInt;
+    }
+
+    public static AppGlobalConfig getInstance(int num) {
+        return MessagesController.getInstance(num).config;
     }
 }

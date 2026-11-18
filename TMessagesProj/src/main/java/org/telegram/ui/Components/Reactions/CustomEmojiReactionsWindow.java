@@ -21,6 +21,8 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.view.Gravity;
@@ -39,6 +41,7 @@ import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimationNotificationsLocker;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
@@ -51,6 +54,7 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.Bulletin;
@@ -61,6 +65,9 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.ReactionsContainerLayout;
 import org.telegram.ui.Components.StableAnimator;
+import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundProvider;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.SelectAnimatedEmojiDialog;
@@ -167,8 +174,6 @@ public class CustomEmojiReactionsWindow {
             }
         });
         attachToParent = type == TYPE_STORY_LIKES || type == TYPE_STICKER_SET_EMOJI || type == TYPE_MESSAGE_EFFECTS || forceAttachToParent;
-
-        // sizeNotifierFrameLayout.setFitsSystemWindows(true);
 
         containerView = new ContainerView(context);
         final int dialogType = reactionsContainerLayout.getWindowType();
@@ -310,6 +315,15 @@ public class CustomEmojiReactionsWindow {
         if (type != TYPE_MESSAGE_EFFECTS) {
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.stopAllHeavyOperations, 7);
         }
+    }
+
+    private BlurredBackgroundDrawable blurredBackgroundDrawable;
+    public void setBackgroundFactory(BlurredBackgroundDrawableViewFactory backgroundFactory, BlurredBackgroundProvider backgroundColorProvider) {
+        this.selectAnimatedEmojiDialog.searchBox.setUseCustomBackground();
+        this.blurredBackgroundDrawable = backgroundFactory.create(containerView, true)
+            .setColorProvider(backgroundColorProvider)
+            .setRadius(dp(12))
+            .setPadding(dp(8));
     }
 
     public void setLongPressEnabled(boolean isEnabled) {
@@ -468,6 +482,7 @@ public class CustomEmojiReactionsWindow {
                 }
                 reactionsContainerLayout.setCustomEmojiEnterProgress(Utilities.clamp(enterTransitionProgress, 1f, 0f));
                 if (!enter) {
+                    reactionsContainerLayout.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
                     reactionsContainerLayout.setSkipDraw(false);
                     removeView();
                     Runtime.getRuntime().gc(); //to prevent garbage collection when reopening
@@ -632,6 +647,20 @@ public class CustomEmojiReactionsWindow {
                 selectAnimatedEmojiDialog.emojiGridView.invalidate();
                 selectAnimatedEmojiDialog.emojiGridView.invalidateViews();
                 selectAnimatedEmojiDialog.searchBox.checkInitialization();
+                selectAnimatedEmojiDialog.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+                reactionsContainerLayout.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+                View firstEmoji = null;
+                for (int i = 0; i < selectAnimatedEmojiDialog.emojiGridView.getChildCount(); i++) {
+                    if (selectAnimatedEmojiDialog.emojiGridView.getChildAt(i) instanceof SelectAnimatedEmojiDialog.ImageViewEmoji) {
+                        firstEmoji = selectAnimatedEmojiDialog.emojiGridView.getChildAt(i);
+                        break;
+                    }
+                }
+                if (firstEmoji != null) {
+                    firstEmoji.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
+                } else {
+                    selectAnimatedEmojiDialog.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
+                }
                 if (reactionsContainerLayout.getPullingLeftProgress() > 0) {
                     reactionsContainerLayout.isHiddenNextReaction = false;
                     reactionsContainerLayout.onCustomEmojiWindowOpened();
@@ -755,7 +784,19 @@ public class CustomEmojiReactionsWindow {
         }
     }
 
-    public class ContainerView extends FrameLayout {
+    public class ContainerView extends FrameLayout implements Theme.Colorable {
+
+        @Override
+        public void updateColors() {
+            try {
+                if (type != TYPE_STORY_LIKES && backgroundPaint != null) {
+                    backgroundPaint.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
+                    invalidate();
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
 
         Drawable shadow;
         Rect shadowPad = new Rect();
@@ -767,7 +808,7 @@ public class CustomEmojiReactionsWindow {
             super(context);
             shadow = ContextCompat.getDrawable(context, R.drawable.reactions_bubble_shadow).mutate();
             shadowPad.left = shadowPad.top = shadowPad.right = shadowPad.bottom = dp(7);
-            shadow.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_chat_messagePanelShadow, resourcesProvider), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.drawableColorFilter(this, shadow, Theme.key_chat_messagePanelShadow, resourcesProvider, PorterDuff.Mode.MULTIPLY);
             if (type == TYPE_STORY_LIKES) {
                 backgroundPaint.setColor(ColorUtils.blendARGB(Color.BLACK, Color.WHITE, 0.13f));
             } else {
@@ -844,8 +885,20 @@ public class CustomEmojiReactionsWindow {
             } else {
                 shadow.setAlpha((int) (Utilities.clamp(progressClpamped / 0.05f, 1f, 0f) * 255));
                 shadow.setBounds((int) drawingRect.left - shadowPad.left, (int) drawingRect.top - shadowPad.top, (int) drawingRect.right + shadowPad.right, (int) drawingRect.bottom + shadowPad.bottom);
-                shadow.draw(canvas);
-                canvas.drawRoundRect(drawingRect, radius, radius, backgroundPaint);
+
+                if (blurredBackgroundDrawable != null) {
+                    AndroidUtilities.rectTmp.set(drawingRect);
+                    AndroidUtilities.rectTmp.round(AndroidUtilities.rectTmp2);
+                    AndroidUtilities.rectTmp2.inset(-dp(8), -dp(8));
+
+                    blurredBackgroundDrawable.setBounds(AndroidUtilities.rectTmp2);
+                    blurredBackgroundDrawable.setAlpha(backgroundPaint.getAlpha());
+                    blurredBackgroundDrawable.setRadius(radius);
+                    blurredBackgroundDrawable.draw(canvas);
+                } else {
+                    shadow.draw(canvas);
+                    canvas.drawRoundRect(drawingRect, radius, radius, backgroundPaint);
+                }
             }
             if (reactionsContainerLayout.hintView != null) {
                 canvas.save();
