@@ -10,7 +10,6 @@ import android.graphics.PorterDuffColorFilter;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -18,16 +17,15 @@ import android.widget.LinearLayout;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
-import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_phone;
+import org.telegram.tgnet.tl.TL_update;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Cells.CheckBoxCell;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.BottomSheetWithRecyclerListView;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ColoredImageSpan;
@@ -47,9 +45,7 @@ import org.telegram.ui.Stories.recorder.HintView2;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Map;
 
 public class CreateGroupCallSheet extends BottomSheetWithRecyclerListView {
 
@@ -70,7 +66,7 @@ public class CreateGroupCallSheet extends BottomSheetWithRecyclerListView {
         this.participants.addAll(participants);
         this.selectedParticipants.addAll(participants);
 
-        fixNavigationBar(getThemedColor(Theme.key_dialogBackground));
+        fixNavigationBarKey(Theme.key_dialogBackground);
         drawDoubleNavigationBar = false;
 
         topView = new FrameLayout(context);
@@ -87,7 +83,7 @@ public class CreateGroupCallSheet extends BottomSheetWithRecyclerListView {
         closeButton.setOnClickListener(v -> dismiss());
 
         final FrameLayout imageBackgroundView = new FrameLayout(context);
-        imageBackgroundView.setBackground(Theme.createCircleDrawable(dp(80), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
+        ThemeBind.fillBackground(imageBackgroundView, Theme.createCircleDrawable(dp(80), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)), ThemeBind.of(Theme.key_featuredStickers_addButton), resourcesProvider);
         final ImageView imageView = new ImageView(context);
         imageView.setImageResource(R.drawable.filled_calls_users);
         imageBackgroundView.addView(imageView, LayoutHelper.createFrame(56, 56, Gravity.CENTER));
@@ -192,7 +188,7 @@ public class CreateGroupCallSheet extends BottomSheetWithRecyclerListView {
                 MessagesController.getInstance(currentAccount).putChats(updates.chats, false);
 
                 TLRPC.GroupCall groupCall = null;
-                for (TLRPC.TL_updateGroupCall upd : findUpdates(updates, TLRPC.TL_updateGroupCall.class)) {
+                for (TL_update.TL_updateGroupCall upd : findUpdates(updates, TL_update.TL_updateGroupCall.class)) {
                     groupCall = upd.call;
                 }
 

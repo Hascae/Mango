@@ -1,5 +1,6 @@
 package org.telegram.messenger;
 
+import org.telegram.tgnet.tl.TL_keyboard;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
 
@@ -995,27 +996,38 @@ public class KeywordMessageFilterManager {
     }
 
     private static void appendReplyMarkup(StringBuilder builder, TLRPC.ReplyMarkup replyMarkup) {
-        if (replyMarkup.rows == null) {
-            return;
-        }
-        for (int i = 0; i < replyMarkup.rows.size(); i++) {
-            TLRPC.TL_keyboardButtonRow row = replyMarkup.rows.get(i);
-            if (row == null || row.buttons == null) {
-                continue;
-            }
-            for (int j = 0; j < row.buttons.size(); j++) {
-                TLRPC.KeyboardButton button = row.buttons.get(j);
-                if (button == null) {
+        if (replyMarkup instanceof TLRPC.TL_replyInlineMarkup) {
+            for (TL_keyboard.KeyboardInlineButtonRow row : ((TLRPC.TL_replyInlineMarkup) replyMarkup).rows) {
+                if (row == null || row.buttons == null) {
                     continue;
                 }
-                appendPart(builder, button.text);
-                appendPart(builder, button.url);
-                appendPart(builder, button.query);
-                appendPart(builder, button.fwd_text);
-                if (button instanceof TLRPC.TL_keyboardButtonCopy_layer223) {
-                    appendPart(builder, ((TLRPC.TL_keyboardButtonCopy_layer223) button).copy_text);
-                } else if (button instanceof TLRPC.TL_keyboardButtonCopy) {
-                    appendPart(builder, ((TLRPC.TL_keyboardButtonCopy) button).copy_text);
+                for (TL_keyboard.KeyboardInlineButton button : row.buttons) {
+                    if (button == null) {
+                        continue;
+                    }
+                    appendPart(builder, button.text);
+                    final TL_keyboard.InlineButtonType type = button.type;
+                    if (type instanceof TL_keyboard.TL_inlineButtonTypeUrl) {
+                        appendPart(builder, ((TL_keyboard.TL_inlineButtonTypeUrl) type).url);
+                    } else if (type instanceof TL_keyboard.TL_inlineButtonTypeUrlAuth) {
+                        appendPart(builder, ((TL_keyboard.TL_inlineButtonTypeUrlAuth) type).url);
+                        appendPart(builder, ((TL_keyboard.TL_inlineButtonTypeUrlAuth) type).fwd_text);
+                    } else if (type instanceof TL_keyboard.TL_inlineButtonTypeSwitchInline) {
+                        appendPart(builder, ((TL_keyboard.TL_inlineButtonTypeSwitchInline) type).query);
+                    } else if (type instanceof TL_keyboard.TL_inlineButtonTypeCopy) {
+                        appendPart(builder, ((TL_keyboard.TL_inlineButtonTypeCopy) type).copy_text);
+                    }
+                }
+            }
+        } else if (replyMarkup instanceof TLRPC.TL_replyKeyboardMarkup) {
+            for (TL_keyboard.KeyboardButtonRow row : ((TLRPC.TL_replyKeyboardMarkup) replyMarkup).rows) {
+                if (row == null || row.buttons == null) {
+                    continue;
+                }
+                for (TL_keyboard.KeyboardButton button : row.buttons) {
+                    if (button != null) {
+                        appendPart(builder, button.text);
+                    }
                 }
             }
         }

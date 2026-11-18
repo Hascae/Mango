@@ -228,11 +228,11 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
         setAdapter(adapter = new ViewPagerAdapter(getContext(), null, parentActionBar));
 
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.dialogPhotosLoaded);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileLoaded);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileLoadProgressChanged);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.reloadDialogPhotos);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.dialogPhotosUpdate);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.dialogPhotosLoaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileLoaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileLoadProgressChanged);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.reloadDialogPhotos);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.dialogPhotosUpdate);
 
         dialogPhotos = null;
     }
@@ -355,11 +355,11 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             }
         });
 
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.dialogPhotosLoaded);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileLoaded);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileLoadProgressChanged);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.reloadDialogPhotos);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.dialogPhotosUpdate);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.dialogPhotosLoaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileLoaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.fileLoadProgressChanged);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.reloadDialogPhotos);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.dialogPhotosUpdate);
 
         dialogPhotos = MessagesController.getInstance(currentAccount).getDialogPhotos(dialogId);
         dialogPhotos.loadCache();
@@ -761,6 +761,11 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         setCurrentItem(adapter.getExtraCount(), false);
     }
 
+    public void setCurrentRealPosition(int realPosition, boolean smooth) {
+        if (adapter == null) return;
+        setCurrentItem(realPosition + adapter.getExtraCount(), smooth);
+    }
+
     public int getRealCount() {
         int size = photos.size();
         if (hasActiveVideo) {
@@ -940,10 +945,10 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                 ImageLocation currentImageLocation = null;
                 if (DialogObject.isChatDialog(dialogId)) {
                     TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-dialogId);
-                    currentImageLocation = ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_BIG);
+                    currentImageLocation = ImageLocation.getForUserOrChat(currentAccount, chat, ImageLocation.TYPE_BIG);
                     if (currentImageLocation != null) {
                         imagesLocations.add(currentImageLocation);
-                        thumbsLocations.add(ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_SMALL));
+                        thumbsLocations.add(ImageLocation.getForUserOrChat(currentAccount, chat, ImageLocation.TYPE_SMALL));
                         vectorAvatars.add(null);
                         thumbsFileNames.add(null);
                         if (chatInfo != null && FileLoader.isSamePhoto(currentImageLocation.location, chatInfo.chat_photo)) {
@@ -1313,7 +1318,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         @Nullable
         @Override
         public CharSequence getPageTitle(int position) {
-            return (getRealPosition(position) + 1) + "/" + (dialogPhotos == null ? 0 : dialogPhotos.getCount());
+            return (getRealPosition(position) + 1) + "/" + getRealCount();
         }
 
         @Override

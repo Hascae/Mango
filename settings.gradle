@@ -2,3 +2,17 @@ include ':TMessagesProj'
 include ':TMessagesProj_Skin'
 include ':TMessagesProj_App'
 include ':TMessagesProj_AppTests'
+include ':jlatexmath'
+project(':jlatexmath').projectDir = file('TMessagesProj/lib/jlatexmath/jlatexmath')
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// Gradle 9 needs a directory behind every project, so the media3 modules hang straight off
+// TMessagesProj_Modules rather than off an intermediate ':media3' with none.
+gradle.ext.androidxMediaModulePrefix = 'TMessagesProj_Modules:media-'
+apply from: file("TMessagesProj_Modules/media/core_settings.gradle")

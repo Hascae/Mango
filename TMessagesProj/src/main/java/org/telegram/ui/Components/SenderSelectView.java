@@ -28,7 +28,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.SkinMetal;
 import org.telegram.ui.SkinStyle;
 
-public class SenderSelectView extends View {
+public class SenderSelectView extends View implements Theme.Colorable {
     private final static float SPRING_MULTIPLIER = 100f;
     private final static FloatPropertyCompat<SenderSelectView> MENU_PROGRESS = new SimpleFloatPropertyCompat<SenderSelectView>("menuProgress", obj -> obj.menuProgress, (obj, value) -> {
         obj.menuProgress = value;
@@ -57,10 +57,24 @@ public class SenderSelectView extends View {
         setContentDescription(LocaleController.formatString("AccDescrSendAsPeer", R.string.AccDescrSendAsPeer, ""));
     }
 
-    private void updateColors() {
+    private int lastSelectorColor;
+
+    @Override
+    public void updateColors() {
         backgroundPaint.setColor(Theme.getColor(Theme.key_chat_messagePanelVoiceBackground));
         menuPaint.setColor(Theme.getColor(Theme.key_chat_messagePanelVoicePressed));
-        selectorDrawable = Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(16), Color.TRANSPARENT, Theme.getColor(Theme.key_windowBackgroundWhite));
+        if (selectorDrawable != null) {
+            // theme update: recolor in place (keeps the pressed state), only when the color changed
+            final int selectorColor = Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhite), 0.2f);
+            if (selectorColor != lastSelectorColor) {
+                lastSelectorColor = selectorColor;
+                Theme.setSelectorDrawableColor(selectorDrawable, selectorColor, true);
+            }
+            invalidate();
+            return;
+        }
+        lastSelectorColor = Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhite), 0.2f);
+        selectorDrawable = Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(18), Color.TRANSPARENT, lastSelectorColor);
         selectorDrawable.setCallback(this);
     }
 
@@ -133,7 +147,7 @@ public class SenderSelectView extends View {
 
         canvas.save();
         menuPaint.setAlpha(alpha);
-        float padding = AndroidUtilities.dp(9) + menuPaint.getStrokeWidth();
+        float padding = AndroidUtilities.dp(10) + menuPaint.getStrokeWidth();
         canvas.drawLine(padding, padding, getWidth() - padding, getHeight() - padding, menuPaint);
         canvas.drawLine(padding, getHeight() - padding, getWidth() - padding, padding, menuPaint);
         canvas.restore();

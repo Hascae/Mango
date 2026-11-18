@@ -1,5 +1,6 @@
 package org.telegram.ui;
 
+import org.telegram.ui.QrShare.QrShareActivity;
 import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
@@ -270,7 +271,8 @@ public class SkinMeActivity extends BaseFragment implements NotificationCenter.N
         public void onQr() {
             Bundle args = new Bundle();
             args.putLong("user_id", getUserConfig().getClientUserId());
-            presentFragment(new QrActivity(args));
+            args.putBoolean(QrShareActivity.ARG_IMMEDIATE, true);
+            presentFragment(new QrShareActivity(args));
         }
 
         @Override

@@ -8,6 +8,9 @@
 
 package org.telegram.ui;
 
+import org.telegram.ui.Components.NumberTextView;
+import static org.telegram.messenger.LocaleController.getString;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -34,6 +37,7 @@ import android.widget.TextView;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -41,6 +45,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BuiltinProxyController;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
@@ -48,14 +53,16 @@ import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.ProxyRotationController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.utils.proxy.ProxySettings;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.ui.ActionBar.ActionBar;
-import org.telegram.ui.ActionBar.ActionBarMenu;
+import org.telegram.ui.ActionBar.SimpleActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
@@ -67,11 +74,11 @@ import org.telegram.ui.Components.CheckBox2;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.NumberTextView;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SlideChooseView;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Collections;
 import java.util.List;
 
@@ -87,7 +94,6 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
     private int currentConnectionState;
 
     private boolean useProxySettings;
-    private boolean useProxyForCalls;
     private boolean vpnAutoSwitchEnabled;
     private boolean remoteRefreshLoading;
 
@@ -104,12 +110,9 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
     private int remoteRefreshRow;
     private int remoteSourceInfoRow;
     private int proxyShadowRow;
-    @Keep
-    private int callsRow;
     private int rotationRow;
     private int rotationTimeoutRow;
     private int rotationTimeoutInfoRow;
-    private int callsDetailRow;
     private int deleteAllRow;
 
     private ItemTouchHelper itemTouchHelper;
@@ -120,7 +123,26 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
     private List<SharedConfig.ProxyInfo> proxyList = new ArrayList<>();
     private boolean wasCheckedAllList;
 
-    public class TextDetailProxyCell extends FrameLayout {
+    public class TextDetailProxyCell extends FrameLayout implements Theme.Colorable {
+
+        @Override
+        public void updateColors() {
+            try {
+                if (valueTextView != null && valueTextView.getTag() instanceof Integer) {
+                    final int newColor = Theme.getColor((Integer) valueTextView.getTag());
+                    if (newColor == color) {
+                        return;
+                    }
+                    color = newColor;
+                    valueTextView.setTextColor(color);
+                    if (checkDrawable != null) {
+                        checkDrawable.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
+                    }
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
 
         private TextView textView;
         private TextView valueTextView;
@@ -138,7 +160,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
             super(context);
 
             textView = new TextView(context);
-            textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteBlackText);
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             textView.setLines(1);
             textView.setMaxLines(1);
@@ -160,9 +182,9 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
 
             checkImageView = new ImageView(context);
             checkImageView.setImageResource(R.drawable.msg_info);
-            checkImageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.colorFilter(checkImageView, Theme.key_windowBackgroundWhiteGrayText3, PorterDuff.Mode.MULTIPLY);
             checkImageView.setScaleType(ImageView.ScaleType.CENTER);
-            checkImageView.setContentDescription(LocaleController.getString(R.string.Edit));
+            checkImageView.setContentDescription(getString(R.string.Edit));
             addView(checkImageView, LayoutHelper.createFrame(48, 48, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP, 8, 8, 8, 0));
             checkImageView.setOnClickListener(v -> presentFragment(new ProxySettingsActivity(currentInfo)));
 
@@ -192,30 +214,30 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 if (currentConnectionState == ConnectionsManager.ConnectionStateConnected || currentConnectionState == ConnectionsManager.ConnectionStateUpdating) {
                     colorKey = Theme.key_windowBackgroundWhiteBlueText6;
                     if (currentInfo.ping != 0) {
-                        valueTextView.setText(LocaleController.getString(R.string.Connected) + ", " + LocaleController.formatString("Ping", R.string.Ping, currentInfo.ping));
+                        valueTextView.setText(getString(R.string.Connected) + ", " + LocaleController.formatString("Ping", R.string.Ping, currentInfo.ping));
                     } else {
-                        valueTextView.setText(LocaleController.getString(R.string.Connected));
+                        valueTextView.setText(getString(R.string.Connected));
                     }
                     if (!currentInfo.checking && !currentInfo.available) {
                         currentInfo.availableCheckTime = 0;
                     }
                 } else {
                     colorKey = Theme.key_windowBackgroundWhiteGrayText2;
-                    valueTextView.setText(LocaleController.getString(R.string.Connecting));
+                    valueTextView.setText(getString(R.string.Connecting));
                 }
             } else {
                 if (currentInfo.checking) {
-                    valueTextView.setText(LocaleController.getString(R.string.Checking));
+                    valueTextView.setText(getString(R.string.Checking));
                     colorKey = Theme.key_windowBackgroundWhiteGrayText2;
                 } else if (currentInfo.available) {
                     if (currentInfo.ping != 0) {
-                        valueTextView.setText(LocaleController.getString(R.string.Available) + ", " + LocaleController.formatString("Ping", R.string.Ping, currentInfo.ping));
+                        valueTextView.setText(getString(R.string.Available) + ", " + LocaleController.formatString("Ping", R.string.Ping, currentInfo.ping));
                     } else {
-                        valueTextView.setText(LocaleController.getString(R.string.Available));
+                        valueTextView.setText(getString(R.string.Available));
                     }
                     colorKey = Theme.key_windowBackgroundWhiteGreenText;
                 } else {
-                    valueTextView.setText(LocaleController.getString(R.string.Unavailable));
+                    valueTextView.setText(getString(R.string.Unavailable));
                     colorKey = Theme.key_text_RedRegular;
                 }
             }
@@ -343,14 +365,13 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
         SharedConfig.loadProxyList();
         currentConnectionState = ConnectionsManager.getInstance(currentAccount).getConnectionState();
 
-        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxyChangedByRotation);
-        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxySettingsChanged);
-        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.proxyCheckDone);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.didUpdateConnectionState);
+        NotificationCenter.getGlobalInstance().addWeakObserver(this, NotificationCenter.proxyChangedByRotation);
+        NotificationCenter.getGlobalInstance().addWeakObserver(this, NotificationCenter.proxySettingsChanged);
+        NotificationCenter.getGlobalInstance().addWeakObserver(this, NotificationCenter.proxyCheckDone);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.didUpdateConnectionState);
 
         final SharedPreferences preferences = MessagesController.getGlobalMainSettings();
         useProxySettings = preferences.getBoolean("proxy_enabled", false) && !SharedConfig.proxyList.isEmpty();
-        useProxyForCalls = preferences.getBoolean("proxy_enabled_calls", false);
         vpnAutoSwitchEnabled = SharedConfig.isVpnProxyAutoSwitchEnabled();
 
         updateRows(true);
@@ -368,15 +389,19 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
     }
 
     @Override
+    protected boolean useSimpleActionBar() {
+        return true;
+    }
+
+    @Override
     public View createView(Context context) {
-        actionBar.setBackButtonDrawable(new BackDrawable(false));
-        actionBar.setAllowOverlayTitle(true);
-        actionBar.setTitle(LocaleController.getString(R.string.ProxySettings));
-        if (AndroidUtilities.isTablet()) {
-            actionBar.setOccupyStatusBar(false);
+        setHasOwnBackground(true);
+        simpleActionBar.setBackButtonDrawable(new BackDrawable(false));
+        simpleActionBar.setTitle(getString(R.string.ProxySettings));
+        if (parentLayout != null && parentLayout.isLayersLayout()) {
+            simpleActionBar.setOccupyStatusBar(false);
         }
-        actionBar.setAllowOverlayTitle(false);
-        actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
+        simpleActionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
@@ -388,14 +413,13 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
         listAdapter = new ListAdapter(context);
 
         fragmentView = new FrameLayout(context);
-        fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
         listView = new RecyclerListView(context);
         listView.setSections();
-        actionBar.setAdaptiveBackground(listView);
         ((DefaultItemAnimator) listView.getItemAnimator()).setDelayAnimations(false);
         ((DefaultItemAnimator) listView.getItemAnimator()).setTranslationInterpolator(CubicBezierInterpolator.DEFAULT);
+        listView.setSectionsDrawBackground(true);
         listView.setVerticalScrollBarEnabled(false);
         listView.setLayoutManager(layoutManager = new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT));
@@ -410,13 +434,8 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                         SharedConfig.currentProxy = proxyList.get(0);
 
                         if (!useProxySettings) {
-                            SharedPreferences preferences = MessagesController.getGlobalMainSettings();
                             SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-                            editor.putString("proxy_ip", SharedConfig.currentProxy.address);
-                            editor.putString("proxy_pass", SharedConfig.currentProxy.password);
-                            editor.putString("proxy_user", SharedConfig.currentProxy.username);
-                            editor.putInt("proxy_port", SharedConfig.currentProxy.port);
-                            editor.putString("proxy_secret", SharedConfig.currentProxy.secret);
+                            SharedConfig.currentProxy.settings.toSharedPreferences(editor);
                             editor.commit();
                         }
                     } else {
@@ -431,23 +450,15 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
 
                 TextCheckCell textCheckCell = (TextCheckCell) view;
                 textCheckCell.setChecked(useProxySettings);
-                if (!useProxySettings) {
-                    RecyclerListView.Holder holder = (RecyclerListView.Holder) listView.findViewHolderForAdapterPosition(callsRow);
-                    if (holder != null) {
-                        textCheckCell = (TextCheckCell) holder.itemView;
-                        textCheckCell.setChecked(false);
-                    }
-                    useProxyForCalls = false;
-                }
 
                 SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
                 editor.putBoolean("proxy_enabled", useProxySettings);
                 editor.commit();
 
-                ConnectionsManager.setProxySettings(useProxySettings, SharedConfig.currentProxy.address, SharedConfig.currentProxy.port, SharedConfig.currentProxy.username, SharedConfig.currentProxy.password, SharedConfig.currentProxy.secret);
+                ConnectionsManager.setProxySettings(useProxySettings, SharedConfig.currentProxy.settings);
                 NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
                 NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
-                NotificationCenter.getGlobalInstance().addObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+                NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
                 ProxyRotationController.refreshSchedule(useProxySettings && SharedConfig.proxyRotationEnabled);
 
                 for (int a = proxyStartRow; a < proxyEndRow; a++) {
@@ -471,13 +482,6 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 ProxyRotationController.refreshSchedule(SharedConfig.proxyRotationEnabled);
 
                 updateRows(true);
-            } else if (position == callsRow) {
-                useProxyForCalls = !useProxyForCalls;
-                TextCheckCell textCheckCell = (TextCheckCell) view;
-                textCheckCell.setChecked(useProxyForCalls);
-                SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-                editor.putBoolean("proxy_enabled_calls", useProxyForCalls);
-                editor.commit();
             } else if (position >= proxyStartRow && position < proxyEndRow) {
                 if (!selectedItems.isEmpty()) {
                     listAdapter.toggleSelected(position);
@@ -486,16 +490,8 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 SharedConfig.ProxyInfo info = proxyList.get(position - proxyStartRow);
                 useProxySettings = true;
                 SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-                editor.putString("proxy_ip", info.address);
-                editor.putString("proxy_pass", info.password);
-                editor.putString("proxy_user", info.username);
-                editor.putInt("proxy_port", info.port);
-                editor.putString("proxy_secret", info.secret);
+                info.settings.toSharedPreferences(editor);
                 editor.putBoolean("proxy_enabled", useProxySettings);
-                if (!info.secret.isEmpty()) {
-                    useProxyForCalls = false;
-                    editor.putBoolean("proxy_enabled_calls", false);
-                }
                 editor.commit();
                 SharedConfig.currentProxy = info;
                 for (int a = proxyStartRow; a < proxyEndRow; a++) {
@@ -512,7 +508,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                     TextCheckCell textCheckCell = (TextCheckCell) holder.itemView;
                     textCheckCell.setChecked(true);
                 }
-                ConnectionsManager.setProxySettings(useProxySettings, SharedConfig.currentProxy.address, SharedConfig.currentProxy.port, SharedConfig.currentProxy.username, SharedConfig.currentProxy.password, SharedConfig.currentProxy.secret);
+                ConnectionsManager.setProxySettings(useProxySettings, SharedConfig.currentProxy.settings);
                 NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
             } else if (position == proxyAddRow) {
                 presentFragment(new ProxySettingsActivity());
@@ -546,22 +542,20 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 });
             } else if (position == deleteAllRow) {
                 AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                builder.setMessage(LocaleController.getString(R.string.DeleteAllProxiesConfirm));
-                builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-                builder.setTitle(LocaleController.getString(R.string.DeleteProxyTitle));
-                builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
+                builder.setMessage(getString(R.string.DeleteAllProxiesConfirm));
+                builder.setNegativeButton(getString(R.string.Cancel), null);
+                builder.setTitle(getString(R.string.DeleteProxyTitle));
+                builder.setPositiveButton(getString(R.string.Delete), (dialog, which) -> {
                     for (SharedConfig.ProxyInfo info : proxyList) {
                         SharedConfig.deleteProxy(info);
                     }
-                    useProxyForCalls = false;
                     useProxySettings = false;
                     NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
                     NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
-                    NotificationCenter.getGlobalInstance().addObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+                    NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
                     updateRows(true);
                     if (listAdapter != null) {
                         listAdapter.notifyItemChanged(useProxyRow, ListAdapter.PAYLOAD_CHECKED_CHANGED);
-                        listAdapter.notifyItemChanged(callsRow, ListAdapter.PAYLOAD_CHECKED_CHANGED);
                         listAdapter.clearSelected();
                     }
                 });
@@ -569,7 +563,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 showDialog(dialog);
                 TextView button = (TextView) dialog.getButton(DialogInterface.BUTTON_POSITIVE);
                 if (button != null) {
-                    button.setTextColor(Theme.getColor(Theme.key_text_RedBold));
+                    ThemeBind.textColor(button, Theme.key_text_RedBold);
                 }
             }
         });
@@ -588,17 +582,12 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
             return false;
         });
 
-        ActionBarMenu actionMode = actionBar.createActionMode();
-        selectedCountTextView = new NumberTextView(actionMode.getContext());
-        selectedCountTextView.setTextSize(18);
-        selectedCountTextView.setTypeface(AndroidUtilities.bold());
-        selectedCountTextView.setTextColor(Theme.getColor(Theme.key_actionBarActionModeDefaultIcon));
-        actionMode.addView(selectedCountTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, 72, 0, 0, 0));
-        selectedCountTextView.setOnTouchListener((v, event) -> true);
+        SimpleActionBarMenu actionMode = simpleActionBar.createActionMode();
 
         deleteMenuItem = actionMode.addItemWithWidth(MENU_DELETE, R.drawable.msg_delete, AndroidUtilities.dp(54));
+        deleteMenuItem.setContentDescription(getString(R.string.Delete));
 
-        actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
+        simpleActionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 switch (id) {
@@ -611,25 +600,23 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                         break;
                     case MENU_DELETE:
                         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                        builder.setMessage(LocaleController.getString(selectedItems.size() > 1 ? R.string.DeleteProxyMultiConfirm : R.string.DeleteProxyConfirm));
-                        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-                        builder.setTitle(LocaleController.getString(R.string.DeleteProxyTitle));
-                        builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
+                        builder.setMessage(getString(selectedItems.size() > 1 ? R.string.DeleteProxyMultiConfirm : R.string.DeleteProxyConfirm));
+                        builder.setNegativeButton(getString(R.string.Cancel), null);
+                        builder.setTitle(getString(R.string.DeleteProxyTitle));
+                        builder.setPositiveButton(getString(R.string.Delete), (dialog, which) -> {
                             for (SharedConfig.ProxyInfo info : selectedItems) {
                                 SharedConfig.deleteProxy(info);
                             }
                             if (SharedConfig.currentProxy == null) {
-                                useProxyForCalls = false;
                                 useProxySettings = false;
                             }
                             NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
                             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
-                            NotificationCenter.getGlobalInstance().addObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+                            NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
                             updateRows(true);
                             if (listAdapter != null) {
                                 if (SharedConfig.currentProxy == null) {
                                     listAdapter.notifyItemChanged(useProxyRow, ListAdapter.PAYLOAD_CHECKED_CHANGED);
-                                    listAdapter.notifyItemChanged(callsRow, ListAdapter.PAYLOAD_CHECKED_CHANGED);
                                 }
                                 listAdapter.clearSelected();
                             }
@@ -638,7 +625,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                         showDialog(dialog);
                         TextView button = (TextView) dialog.getButton(DialogInterface.BUTTON_POSITIVE);
                         if (button != null) {
-                            button.setTextColor(Theme.getColor(Theme.key_text_RedBold));
+                            ThemeBind.textColor(button, Theme.key_text_RedBold);
                         }
                         break;
                 }
@@ -705,17 +692,15 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
         builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
             SharedConfig.deleteProxy(info);
             if (SharedConfig.currentProxy == null) {
-                useProxyForCalls = false;
                 useProxySettings = false;
             }
             NotificationCenter.getGlobalInstance().removeObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
-            NotificationCenter.getGlobalInstance().addObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
+            NotificationCenter.getGlobalInstance().addWeakObserver(ProxyListActivity.this, NotificationCenter.proxySettingsChanged);
             updateRows(true);
             if (listAdapter != null) {
                 if (SharedConfig.currentProxy == null) {
                     listAdapter.notifyItemChanged(useProxyRow, ListAdapter.PAYLOAD_CHECKED_CHANGED);
-                    listAdapter.notifyItemChanged(callsRow, ListAdapter.PAYLOAD_CHECKED_CHANGED);
                 }
                 listAdapter.clearSelected();
             }
@@ -808,23 +793,6 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
         remoteRefreshRow = rowCount++;
         remoteSourceInfoRow = rowCount++;
         proxyShadowRow = rowCount++;
-        if (SharedConfig.currentProxy == null || SharedConfig.currentProxy.secret.isEmpty()) {
-            boolean change = callsRow == -1;
-            callsRow = rowCount++;
-            callsDetailRow = rowCount++;
-            if (!notify && change) {
-                listAdapter.notifyItemChanged(proxyShadowRow);
-                listAdapter.notifyItemRangeInserted(proxyShadowRow + 1, 2);
-            }
-        } else {
-            boolean change = callsRow != -1;
-            callsRow = -1;
-            callsDetailRow = -1;
-            if (!notify && change) {
-                listAdapter.notifyItemChanged(proxyShadowRow);
-                listAdapter.notifyItemRangeRemoved(proxyShadowRow + 1, 2);
-            }
-        }
         if (!proxyList.isEmpty()) {
             deleteAllRow = rowCount++;
         } else {
@@ -844,7 +812,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 continue;
             }
             proxyInfo.checking = true;
-            proxyInfo.proxyCheckPingId = ConnectionsManager.getInstance(currentAccount).checkProxy(proxyInfo.address, proxyInfo.port, proxyInfo.username, proxyInfo.password, proxyInfo.secret, time -> AndroidUtilities.runOnUIThread(() -> {
+            ConnectionsManager.getInstance(currentAccount).checkProxy(proxyInfo.settings, time -> AndroidUtilities.runOnUIThread(() -> {
                 proxyInfo.availableCheckTime = SystemClock.elapsedRealtime();
                 proxyInfo.checking = false;
                 if (time == -1) {
@@ -982,17 +950,17 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
 
         private void checkActionMode() {
             int selectedCount = selectedItems.size();
-            boolean actionModeShowed = actionBar.isActionModeShowed();
+            boolean actionModeShowed = simpleActionBar.isActionModeShowed();
             if (selectedCount > 0) {
-                selectedCountTextView.setNumber(selectedCount, actionModeShowed);
+                simpleActionBar.setActionModeCount(selectedCount, actionModeShowed);
                 if (!actionModeShowed) {
-                    actionBar.showActionMode();
+                    simpleActionBar.showActionMode();
                     if (proxyStartRow >= 0 && proxyEndRow > proxyStartRow) {
                     notifyItemRangeChanged(proxyStartRow, proxyEndRow - proxyStartRow, PAYLOAD_SELECTION_MODE_CHANGED);
                 }
                 }
             } else if (actionModeShowed) {
-                actionBar.hideActionMode();
+                simpleActionBar.hideActionMode();
                 if (proxyStartRow >= 0 && proxyEndRow > proxyStartRow) {
                     notifyItemRangeChanged(proxyStartRow, proxyEndRow - proxyStartRow, PAYLOAD_SELECTION_MODE_CHANGED);
                 }
@@ -1012,7 +980,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 }
                 case VIEW_TYPE_TEXT_SETTING: {
                     TextSettingsCell textCell = (TextSettingsCell) holder.itemView;
-                    textCell.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+                    ThemeBind.textColor(textCell.getTextView(), Theme.key_windowBackgroundWhiteBlackText);
                     textCell.setCanDisable(false);
                     textCell.setEnabled(true);
                     textCell.setDrawLoading(false, 24, false);
@@ -1028,15 +996,15 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                         textCell.setEnabled(!remoteRefreshLoading);
                         textCell.setDrawLoading(remoteRefreshLoading, 24, false);
                     } else if (position == deleteAllRow) {
-                        textCell.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
-                        textCell.setText(LocaleController.getString(R.string.DeleteAllProxies), false);
+                        ThemeBind.textColor(textCell.getTextView(), Theme.key_text_RedRegular);
+                        textCell.setText(getString(R.string.DeleteAllProxies), false);
                     }
                     break;
                 }
                 case VIEW_TYPE_HEADER: {
                     HeaderCell headerCell = (HeaderCell) holder.itemView;
                     if (position == connectionsHeaderRow) {
-                        headerCell.setText(LocaleController.getString(R.string.ProxyConnections));
+                        headerCell.setText(getString(R.string.ProxyConnections));
                     }
                     break;
                 }
@@ -1046,18 +1014,14 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                         checkCell.setTextAndCheck(LocaleController.getString(R.string.UseProxySettings), useProxySettings, true);
                     } else if (position == vpnAutoSwitchRow) {
                         checkCell.setTextAndCheck(LocaleController.getString(R.string.VpnProxyAutoSwitch), vpnAutoSwitchEnabled, rotationRow != -1);
-                    } else if (position == callsRow) {
-                        checkCell.setTextAndCheck(LocaleController.getString(R.string.UseProxyForCalls), useProxyForCalls, false);
                     } else if (position == rotationRow) {
-                        checkCell.setTextAndCheck(LocaleController.getString(R.string.UseProxyRotation), SharedConfig.proxyRotationEnabled, true);
+                        checkCell.setTextAndCheck(getString(R.string.UseProxyRotation), SharedConfig.proxyRotationEnabled, true);
                     }
                     break;
                 }
                 case VIEW_TYPE_INFO: {
                     TextInfoPrivacyCell cell = (TextInfoPrivacyCell) holder.itemView;
-                    if (position == callsDetailRow) {
-                        cell.setText(LocaleController.getString(R.string.UseProxyForCallsInfo));
-                    } else if (position == remoteSourceInfoRow) {
+                    if (position == remoteSourceInfoRow) {
                         cell.setText(LocaleController.getString(R.string.BuiltinProxyRemoteSourceInfo));
                     } else if (position == rotationTimeoutInfoRow) {
                         cell.setText(LocaleController.getString(R.string.ProxyRotationIntervalInfo));
@@ -1110,8 +1074,6 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                     checkCell.setChecked(useProxySettings);
                 } else if (position == vpnAutoSwitchRow) {
                     checkCell.setChecked(vpnAutoSwitchEnabled);
-                } else if (position == callsRow) {
-                    checkCell.setChecked(useProxyForCalls);
                 } else if (position == rotationRow) {
                     checkCell.setChecked(SharedConfig.proxyRotationEnabled);
                 }
@@ -1130,8 +1092,6 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                     checkCell.setChecked(useProxySettings);
                 } else if (position == vpnAutoSwitchRow) {
                     checkCell.setChecked(vpnAutoSwitchEnabled);
-                } else if (position == callsRow) {
-                    checkCell.setChecked(useProxyForCalls);
                 } else if (position == rotationRow) {
                     checkCell.setChecked(SharedConfig.proxyRotationEnabled);
                 }
@@ -1141,7 +1101,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
             int position = holder.getAdapterPosition();
-            return position == useProxyRow || position == vpnAutoSwitchRow || position == rotationRow || position == callsRow || position == proxyAddRow || position == remoteRefreshRow || position == deleteAllRow || position >= proxyStartRow && position < proxyEndRow;
+            return position == useProxyRow || position == vpnAutoSwitchRow || position == rotationRow || position == proxyAddRow || position == remoteRefreshRow || position == deleteAllRow || position >= proxyStartRow && position < proxyEndRow;
         }
 
         @Override
@@ -1153,27 +1113,27 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                     break;
                 case VIEW_TYPE_TEXT_SETTING:
                     view = new TextSettingsCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    ThemeBind.backgroundColor(view, Theme.key_windowBackgroundWhite);
                     break;
                 case VIEW_TYPE_HEADER:
                     view = new HeaderCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    ThemeBind.backgroundColor(view, Theme.key_windowBackgroundWhite);
                     break;
                 case VIEW_TYPE_TEXT_CHECK:
                     view = new TextCheckCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    ThemeBind.backgroundColor(view, Theme.key_windowBackgroundWhite);
                     break;
                 case VIEW_TYPE_INFO:
                     view = new TextInfoPrivacyCell(mContext);
                     break;
                 case VIEW_TYPE_SLIDE_CHOOSER:
                     view = new SlideChooseView(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    ThemeBind.backgroundColor(view, Theme.key_windowBackgroundWhite);
                     break;
                 case VIEW_TYPE_PROXY_DETAIL:
                 default:
                     view = new TextDetailProxyCell(mContext);
-                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    ThemeBind.backgroundColor(view, Theme.key_windowBackgroundWhite);
                     break;
             }
             view.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
@@ -1197,8 +1157,6 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 return -4;
             } else if (position == vpnAutoSwitchRow) {
                 return -15;
-            } else if (position == callsRow) {
-                return -5;
             } else if (position == connectionsHeaderRow) {
                 return -6;
             } else if (position == deleteAllRow) {
@@ -1222,7 +1180,7 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
                 return VIEW_TYPE_SHADOW;
             } else if (position == proxyAddRow || position == remoteRefreshRow || position == deleteAllRow) {
                 return VIEW_TYPE_TEXT_SETTING;
-            } else if (position == useProxyRow || position == vpnAutoSwitchRow || position == rotationRow || position == callsRow) {
+            } else if (position == useProxyRow || position == vpnAutoSwitchRow || position == rotationRow) {
                 return VIEW_TYPE_TEXT_CHECK;
             } else if (position == connectionsHeaderRow) {
                 return VIEW_TYPE_HEADER;
@@ -1237,42 +1195,56 @@ public class ProxyListActivity extends BaseFragment implements NotificationCente
     }
 
     @Override
+    public boolean isSupportEdgeToEdge() {
+        return true;
+    }
+
+    @Nullable
+    @Override
+    protected RecyclerListView getListViewForSimpleGlass() {
+        return listView;
+    }
+
+    @Override
     public ArrayList<ThemeDescription> getThemeDescriptions() {
         ArrayList<ThemeDescription> themeDescriptions = new ArrayList<>();
 
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_CELLBACKGROUNDCOLOR, new Class[]{TextSettingsCell.class, TextCheckCell.class, HeaderCell.class, TextDetailProxyCell.class}, null, null, null, Theme.key_windowBackgroundWhite));
-        themeDescriptions.add(new ThemeDescription(fragmentView, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_windowBackgroundGray));
 
 //        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_actionBarDefault));
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_LISTGLOWCOLOR, null, null, null, null, Theme.key_actionBarDefault));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_ITEMSCOLOR, null, null, null, null, Theme.key_actionBarDefaultIcon));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_TITLECOLOR, null, null, null, null, Theme.key_actionBarDefaultTitle));
-        themeDescriptions.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_SELECTORCOLOR, null, null, null, null, Theme.key_actionBarDefaultSelector));
 
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_SELECTOR, null, null, null, null, Theme.key_listSelector));
 
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{View.class}, Theme.dividerPaint, null, null, Theme.key_divider));
 
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextSettingsCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteBlackText));
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextSettingsCell.class}, new String[]{"valueTextView"}, null, null, null, Theme.key_windowBackgroundWhiteValueText));
 
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextDetailProxyCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteBlackText));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR | ThemeDescription.FLAG_CHECKTAG | ThemeDescription.FLAG_IMAGECOLOR, new Class[]{TextDetailProxyCell.class}, new String[]{"valueTextView"}, null, null, null, Theme.key_windowBackgroundWhiteBlueText6));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR | ThemeDescription.FLAG_CHECKTAG | ThemeDescription.FLAG_IMAGECOLOR, new Class[]{TextDetailProxyCell.class}, new String[]{"valueTextView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText2));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR | ThemeDescription.FLAG_CHECKTAG | ThemeDescription.FLAG_IMAGECOLOR, new Class[]{TextDetailProxyCell.class}, new String[]{"valueTextView"}, null, null, null, Theme.key_windowBackgroundWhiteGreenText));
         themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_TEXTCOLOR | ThemeDescription.FLAG_CHECKTAG | ThemeDescription.FLAG_IMAGECOLOR, new Class[]{TextDetailProxyCell.class}, new String[]{"valueTextView"}, null, null, null, Theme.key_text_RedRegular));
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_IMAGECOLOR, new Class[]{TextDetailProxyCell.class}, new String[]{"checkImageView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText3));
 
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{HeaderCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteBlueHeader));
 
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextCheckCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteBlackText));
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextCheckCell.class}, new String[]{"valueTextView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText2));
         themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextCheckCell.class}, new String[]{"checkBox"}, null, null, null, Theme.key_switchTrack));
         themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextCheckCell.class}, new String[]{"checkBox"}, null, null, null, Theme.key_switchTrackChecked));
 
-        themeDescriptions.add(new ThemeDescription(listView, ThemeDescription.FLAG_BACKGROUNDFILTER, new Class[]{TextInfoPrivacyCell.class}, null, null, null, Theme.key_windowBackgroundGrayShadow));
-        themeDescriptions.add(new ThemeDescription(listView, 0, new Class[]{TextInfoPrivacyCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText4));
 
         return themeDescriptions;
+    }
+
+    /** theme editor: colors this page shows (former ThemeDescription keys) */
+    @Override
+    public void addThemeColorKeys(HashSet<Integer> keys) {
+        super.addThemeColorKeys(keys);
+        keys.add(Theme.key_windowBackgroundWhiteGrayText4);
+        keys.add(Theme.key_windowBackgroundGrayShadow);
+        keys.add(Theme.key_windowBackgroundWhiteGrayText2);
+        keys.add(Theme.key_windowBackgroundWhiteBlackText);
+        keys.add(Theme.key_windowBackgroundWhiteBlueHeader);
+        keys.add(Theme.key_windowBackgroundWhiteGrayText3);
+        keys.add(Theme.key_windowBackgroundWhiteValueText);
+        keys.add(Theme.key_divider);
+        keys.add(Theme.key_listSelector);
+        keys.add(Theme.key_actionBarDefaultSelector);
+        keys.add(Theme.key_actionBarDefaultTitle);
+        keys.add(Theme.key_actionBarDefaultIcon);
+        keys.add(Theme.key_actionBarDefault);
+        keys.add(Theme.key_windowBackgroundWhite);
     }
 }

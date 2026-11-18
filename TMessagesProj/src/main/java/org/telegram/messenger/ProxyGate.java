@@ -1,5 +1,6 @@
 package org.telegram.messenger;
 
+import org.telegram.utils.proxy.ProxySettings;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
@@ -172,19 +173,16 @@ public class ProxyGate {
             return;
         }
         SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit().putBoolean("proxy_enabled", enabled);
-        if (!enabled || !TextUtils.isEmpty(proxy.secret)) {
-            editor.putBoolean("proxy_enabled_calls", false);
-        }
         editor.commit();
 
         applying = true;
         try {
             if (enabled) {
-                ConnectionsManager.setProxySettings(true, proxy.address, proxy.port, proxy.username, proxy.password, proxy.secret);
+                ConnectionsManager.setProxySettings(true, proxy.settings);
                 // Also reaches account 0 before anyone has logged in.
                 BuiltinProxyController.refreshProxyConnection();
             } else {
-                ConnectionsManager.setProxySettings(false, "", 0, "", "", "");
+                ConnectionsManager.setProxySettings(false, ProxySettings.EMPTY);
                 // Account 0 is not activated until login, but its connection is already up.
                 if (!early && !isActivated(0)) {
                     ConnectionsManager.native_setProxySettings(0, "", 1080, "", "", "");
