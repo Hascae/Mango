@@ -7,8 +7,6 @@
     <string name="ConnectingConnectProxy">Conectar proxy</string>
     <string name="LocalHoldVerificationTitle">Certificação de retenção local</string>
     <string name="LocalHoldVerificationInfo">Esta conta passou na verificação de retenção de terceiros.</string>
-    <string name="FeedbackSupportChannel">Canal de atendimento ao cliente de feedback de problemas</string>
-    <string name="ContactSoftwareDeveloper">Entre em contato com o desenvolvedor de software</string>
     <string name="ExtensionFeatures">Centro de Extensão</string>
     <string name="ExtensionFeaturesInfo">Os interruptores de atalho nos três pontos no canto superior direito ainda são mantidos e uma entrada de configuração unificada é fornecida aqui.</string>
     <string name="DeviceInfoTitle">Informações do dispositivo</string>
@@ -110,7 +108,6 @@
     <string name="CachedFileDeleted">O arquivo de cache foi excluído</string>
     <string name="CachedFileDeleteFailed">Nenhum arquivo de cache que possa ser excluído foi encontrado</string>
     <string name="SaveStickerToGallery">Salvar emoticons no álbum de fotos</string>
-    <string name="AccountCancellationBot">Cancelar conta</string>
     <string name="UnlimitedChannelJoinTitle">Romper o limite superior de adição de canais</string>
     <string name="UnlimitedChannelJoinInfo">está habilitado por padrão. O cliente reduzirá o prompt de limite de canal de ingresso local, mas o limite real retornado pelo servidor Telegram ainda pode estar em vigor.</string>
     <string name="UnlimitedDialogFiltersTitle">Rompe o limite de agrupamento</string>

@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -51,6 +52,7 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.BasePermissionsActivity;
 import org.telegram.ui.LaunchActivity;
@@ -73,6 +75,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
     public final static int FOR_TYPE_USER = 0;
     public final static int FOR_TYPE_CHANNEL = 1;
     public final static int FOR_TYPE_GROUP = 2;
+    public final static int FOR_TYPE_COMMUNITY = 3;
 
     public BaseFragment parentFragment;
     private ImageUpdaterDelegate delegate;
@@ -130,7 +133,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
         }
         MessageObject avatarObject = null;
         Bitmap bitmap;
-        if (photoEntry.isVideo || photoEntry.editedInfo != null) {
+        if ((photoEntry.isVideo || photoEntry.editedInfo != null) && !photoEntry.isLivePhoto()) {
             TLRPC.TL_message message = new TLRPC.TL_message();
             message.id = 0;
             message.message = "";
@@ -328,6 +331,14 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
         parentFragment.showDialog(sheet);
         if (hasAvatar) {
             sheet.setItemColor(items.size() - 1, Theme.getColor(Theme.key_text_RedBold), Theme.getColor(Theme.key_text_RedRegular));
+            final int index = items.size() - 1;
+            if (index >= 0 && index < sheet.getItemViews().size()) {
+                final BottomSheet.BottomSheetCell cell = sheet.getItemViews().get(index);
+                if (cell != null && cell.getTextView() != null && cell.getImageView() != null) {
+                    ThemeBind.textColor(cell.getTextView(), Theme.key_text_RedBold);
+                    ThemeBind.colorFilter(cell.getImageView(), Theme.key_text_RedRegular, PorterDuff.Mode.MULTIPLY);
+                }
+            }
         }
     }
 
@@ -499,7 +510,10 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
                                 info.thumbPath = photoEntry.thumbPath;
                                 info.coverPath = photoEntry.coverPath;
                                 info.videoEditedInfo = photoEntry.editedInfo;
+                                info.isLivePhoto = photoEntry.isLivePhoto();
                                 info.isVideo = photoEntry.isVideo;
+                                info.livePhotoVideoOffset = photoEntry.livePhotoVideoOffset;
+                                info.discardLivePhoto = true;
                                 info.caption = photoEntry.caption != null ? photoEntry.caption.toString() : null;
                                 info.entities = photoEntry.entities;
                                 info.masks = photoEntry.stickers;
@@ -590,7 +604,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
             SendMessagesHelper.SendingMediaInfo info = photos.get(0);
             Bitmap bitmap = null;
             MessageObject avatarObject = null;
-            if (info.isVideo || info.videoEditedInfo != null) {
+            if ((info.isVideo || info.videoEditedInfo != null) && !info.isLivePhoto) {
                 TLRPC.TL_message message = new TLRPC.TL_message();
                 message.id = 0;
                 message.message = "";

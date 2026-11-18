@@ -10,22 +10,22 @@ import org.telegram.messenger.BaseController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.json.TLJsonBuilder;
-import org.telegram.tgnet.TLMethod;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.json.TLJsonParser;
 import org.telegram.tgnet.tl.TL_phone;
+import org.telegram.tgnet.tl.TL_update;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 public class GroupCallMessagesController extends BaseController {
@@ -35,11 +35,14 @@ public class GroupCallMessagesController extends BaseController {
         void onPopGroupCallMessage();
     }
 
-    public void processUpdate(TLRPC.TL_updateGroupCallMessage update) {
+    public void processUpdate(TL_update.TL_updateGroupCallMessage update) {
         final long callId = update.call.id;
         final long fromId = DialogObject.getPeerDialogId(update.message.from_id);
         final long id = update.message.id;
         if (getUserConfig().clientUserId == fromId) {
+            return;
+        }
+        if (sentMessageIds.contains(callId + "_" + id)) {
             return;
         }
 
@@ -48,7 +51,7 @@ public class GroupCallMessagesController extends BaseController {
         AndroidUtilities.runOnUIThread(() -> pushMessageToList(callId, message));
     }
 
-    public void processUpdate(TLRPC.TL_updateGroupCallEncryptedMessage update) {
+    public void processUpdate(TL_update.TL_updateGroupCallEncryptedMessage update) {
         final long callId = update.call.id;
         final long fromId = DialogObject.getPeerDialogId(update.from_id);
         final byte[] encrypted = update.encrypted_message;
@@ -60,13 +63,13 @@ public class GroupCallMessagesController extends BaseController {
             TLRPC.TL_groupCallMessage result = null;
             try {
                 final byte[] decrypted = groupCallMessageDecrypt(callId, fromId, encrypted);
-                if (decrypted != null) {
+                if (decrypted != null && decrypted.length <= 8192) {
                     final String jsonString = new String(decrypted);
                     final JSONObject jsonObject = new JSONObject(jsonString);
 
                     result = TLRPC.TL_groupCallMessage.TLJsonDeserialize(new TLJsonParser(jsonObject));
                 }
-            } catch (Exception e) {
+            } catch (Exception | StackOverflowError e) {
                 FileLog.e(e);
             }
 
@@ -147,6 +150,23 @@ public class GroupCallMessagesController extends BaseController {
                 }
             } else if (response instanceof TLRPC.Updates) {
                 sendingGroupCallMessage.setIsSendConfirmed(true);
+                // the server echoes our message back, skip it (sent as a channel/chat it isn't from our user id)
+                final TLRPC.Updates updates = (TLRPC.Updates) response;
+                final ArrayList<TLRPC.Update> list = new ArrayList<>(updates.updates);
+                if (updates.update != null) {
+                    list.add(updates.update);
+                }
+                for (TLRPC.Update update : list) {
+                    if (update instanceof TL_update.TL_updateGroupCallMessage) {
+                        final TL_update.TL_updateGroupCallMessage u = (TL_update.TL_updateGroupCallMessage) update;
+                        if (u.call != null && u.call.id == callId && u.message != null && DialogObject.getPeerDialogId(u.message.from_id) == sendAsPeerId) {
+                            final String key = callId + "_" + u.message.id;
+                            if (sentMessageIds.add(key)) {
+                                AndroidUtilities.runOnUIThread(() -> sentMessageIds.remove(key), 60_000);
+                            }
+                        }
+                    }
+                }
                 getMessagesController().processUpdates((TLRPC.Updates) response, false);
             }
             AndroidUtilities.runOnUIThread(sendingGroupCallMessage::notifyStateUpdate);
@@ -188,6 +208,7 @@ public class GroupCallMessagesController extends BaseController {
 
     private final LongSparseArray<List<CallMessageListener>> callMessagesListeners = new LongSparseArray<>();
     private final LongSparseArray<MessagesList> callMessagesList = new LongSparseArray<>();
+    private final Set<String> sentMessageIds = ConcurrentHashMap.newKeySet();
 
     private void pushMessageToList(long callId, GroupCallMessage message) {
         MessagesList messages = callMessagesList.get(callId);

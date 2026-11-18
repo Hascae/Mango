@@ -5,6 +5,7 @@ import com.android.build.api.variant.HostTestBuilder
 // plain JVM (see the screenshotTest suite) without building the app.
 plugins {
     id("com.android.library")
+    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 

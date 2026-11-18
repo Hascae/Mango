@@ -19,7 +19,7 @@ import android.widget.LinearLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.DefaultItemAnimator;
-import androidx.recyclerview.widget.LinearSmoothScrollerCustom;
+import org.telegram.ui.recyclerview.LinearSmoothScrollerCustom;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -34,6 +34,7 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.BottomSheetWithRecyclerListView;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CubicBezierInterpolator;
@@ -61,17 +62,17 @@ public class MultiContactsSelectorBottomSheet extends BottomSheetWithRecyclerLis
         void onUserSelected(List<Long> ids);
     }
 
-    public static void open(Boolean bots, Boolean premium, int maxCount, SelectorListener selectorListener) {
+    public static MultiContactsSelectorBottomSheet open(Boolean bots, Boolean premium, int maxCount, SelectorListener selectorListener) {
         BaseFragment fragment = LaunchActivity.getLastFragment();
         if (fragment == null) {
-            return;
+            return null;
         }
         if (instance != null) {
-            return;
+            return instance;
         }
         MultiContactsSelectorBottomSheet sheet = new MultiContactsSelectorBottomSheet(fragment, true, maxCount, bots, premium, selectorListener);
         sheet.show();
-        instance = sheet;
+        return instance = sheet;
     }
 
     private static final int BOTTOM_HEIGHT_DP = 60;
@@ -211,7 +212,7 @@ public class MultiContactsSelectorBottomSheet extends BottomSheetWithRecyclerLis
                 }
             }
         };
-        searchField.setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+        ThemeBind.backgroundColor(searchField, Theme.key_dialogBackground, resourcesProvider);
         searchField.setOnSearchTextChange(this::onSearch);
         searchField.setHintText(LocaleController.getString(R.string.Search), false);
 
@@ -230,7 +231,7 @@ public class MultiContactsSelectorBottomSheet extends BottomSheetWithRecyclerLis
         buttonContainer.setClickable(true);
         buttonContainer.setOrientation(LinearLayout.VERTICAL);
         buttonContainer.setPadding(dp(10), dp(10), dp(10), dp(10));
-        buttonContainer.setBackgroundColor(Theme.getColor(Theme.key_dialogBackground, resourcesProvider));
+        ThemeBind.backgroundColor(buttonContainer, Theme.key_dialogBackground, resourcesProvider);
         actionButton = new ButtonWithCounterView(getContext(), resourcesProvider) {
             @Override
             protected float calculateCounterWidth(float width, float percent) {

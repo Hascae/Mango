@@ -32,6 +32,7 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.AvatarsImageView;
 import org.telegram.ui.Components.BackupImageView;
@@ -152,7 +153,7 @@ public class GroupCallSheet {
         linearLayout.setPadding(dp(14), 0, dp(14), dp(8));
 
         final FrameLayout imageBackgroundView = new FrameLayout(context);
-        imageBackgroundView.setBackground(Theme.createCircleDrawable(dp(80), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
+        ThemeBind.fillBackground(imageBackgroundView, Theme.createCircleDrawable(dp(80), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)), ThemeBind.of(Theme.key_featuredStickers_addButton), resourcesProvider);
         final ImageView imageView = new ImageView(context);
         imageView.setImageResource(R.drawable.filled_calls_users);
         imageBackgroundView.addView(imageView, LayoutHelper.createFrame(56, 56, Gravity.CENTER));
@@ -204,23 +205,13 @@ public class GroupCallSheet {
             }
             textView.setMaxWidth(HintView2.cutInFancyHalf(textView.getText(), textView.getPaint()));
             linearLayout.addView(textView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 2, 0, 2, 25));
-
-//            UniversalRecyclerView listView = new UniversalRecyclerView(context, currentAccount, 0, (items, adapter) -> {
-//                for (long id : participantIds) {
-//                    items.add(UserView.Factory.asUser(id));
-//                }
-//            }, null, null, resourcesProvider);
-//            listView.makeHorizontal();
-//            listView.setPadding(dp(10), 0, dp(10), 0);
-//            listView.setClipToPadding(false);
-//            linearLayout.addView(listView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 122, Gravity.CENTER_HORIZONTAL, 2, 0, 2, 0));
         }
 
         final LinearLayout checkboxLayout = new LinearLayout(context);
         checkboxLayout.setPadding(dp(12), dp(8), dp(12), dp(8));
         checkboxLayout.setClipToPadding(false);
         checkboxLayout.setOrientation(LinearLayout.HORIZONTAL);
-        checkboxLayout.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 6, 6));
+        ThemeBind.selectorBackground(checkboxLayout, Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 20, 20), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
         final CheckBox2 checkbox = new CheckBox2(context, 24, resourcesProvider);
         checkbox.setColor(Theme.key_radioBackgroundChecked, Theme.key_checkboxDisabled, Theme.key_checkboxCheck);
         checkbox.setDrawUnchecked(true);
@@ -228,9 +219,9 @@ public class GroupCallSheet {
         checkbox.setDrawBackgroundAsArc(10);
         checkboxLayout.addView(checkbox, LayoutHelper.createLinear(26, 26, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
         final TextView checkboxTextView = new TextView(context);
-        checkboxTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+        ThemeBind.textColor(checkboxTextView, Theme.key_dialogTextBlack, resourcesProvider);
         checkboxTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        checkboxTextView.setText("Turn on the microphone");
+        checkboxTextView.setText(getString(R.string.GroupCallLinkMicrophone));
         checkboxLayout.addView(checkboxTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 9, 0, 0, 0));
         linearLayout.addView(checkboxLayout, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 38, Gravity.CENTER_HORIZONTAL, 0, 4, 0, 12));
         ScaleStateListAnimator.apply(checkboxLayout, 0.025f, 1.5f);
@@ -239,7 +230,7 @@ public class GroupCallSheet {
             MessagesController.getGlobalMainSettings().edit().putBoolean("callmiconstart", checkbox.isChecked()).apply();
         });
 
-        final ButtonWithCounterView joinButton = new ButtonWithCounterView(context, resourcesProvider);
+        final ButtonWithCounterView joinButton = new ButtonWithCounterView(context, resourcesProvider).setRound();
         joinButton.setText(getString(R.string.GroupCallLinkJoin), false);
         linearLayout.addView(joinButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 2, 0, 2, 0));
 
